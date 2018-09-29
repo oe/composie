@@ -28,7 +28,11 @@ trim() {
 
 # tag
 # read package.json's version
-version=`cat package.json | awk -F [:] '/version/{print $2}' | sed 's/[\"\,]//g'`
+version=$(cat package.json \
+  | grep version \
+  | head -1 \
+  | awk -F: '{ print $2 }' \
+  | sed 's/[",]//g')
 tag="v`trim ${version}`"
 
 git tag "${tag}"
