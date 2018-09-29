@@ -1,5 +1,5 @@
 /*!
- * Composie v0.0.6
+ * Composie v0.0.7
  * Copyright© 2018 Saiya https://github.com/evecalm/composie#readme
  */
 function getUniqID() {

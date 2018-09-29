@@ -66,7 +66,7 @@ composie
   });
 
 // get response with promise
-harbor.run("api/user-info").then(
+composie.run("api/user-info").then(
   function(resp) {
     console.log(resp);
   },
@@ -76,7 +76,7 @@ harbor.run("api/user-info").then(
   }
 );
 
-harbor.run("api/user-info", { id: "xxxxxx" }).then(
+composie.run("api/user-info", { id: "xxxxxx" }).then(
   function(resp) {
     console.log(resp);
     // => I am from first route for api/user-info, hello from second, request at 1538209634315
