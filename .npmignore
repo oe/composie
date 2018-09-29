@@ -1,0 +1,10 @@
+config.codekit
+coverage
+.idea
+test
+src
+.*
+*.config.js
+*.sh
+tsconfig.json
+tslint.json
