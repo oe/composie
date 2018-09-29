@@ -1,8 +1,9 @@
 config.codekit
 coverage
-.idea
 test
 src
+build
+.idea
 .*
 *.config.js
 *.sh
