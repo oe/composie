@@ -15,4 +15,180 @@
 
 <br>
 
-## To Be Continued
+This is a koa & koa-routers like library that enable you compose middleware and run it easily.
+
+## Install
+
+```sh
+npm install composie
+```
+
+or
+
+```sh
+yarn add composie
+```
+
+## Example
+
+```js
+const Composie = require("composie");
+const composie = new Composie();
+composie
+  // add a global middleware to log
+  .use(function(ctx, next) {
+    console.log("request from channel", ctx.channel);
+    next();
+  })
+  // add a global middleware to validate request data
+  .use(function(ctx, next) {
+    if (!ctx.request) throw new Error("bad request");
+    next();
+  })
+  // add middleware for channel with prefix 'api/'
+  .use("api/", function(ctx, next) {
+    ctx.from = +new Date();
+    next();
+  })
+  // add a router for channel 'api/user-info'
+  .route("api/user-info", function(ctx, next) {
+    ctx.response = "I am from first route for api/user-info";
+  })
+  // add multi router
+  .route({
+    // add another router for "api/user-info"
+    "api/user-info": function(ctx, next) {
+      ctx.response += ", hello from second, request at " + ctx.from;
+    },
+    "view/home": function(ctx, next) {
+      ctx.response = "This is home page";
+    }
+  });
+
+// get response with promise
+harbor.run("api/user-info").then(
+  function(resp) {
+    console.log(resp);
+  },
+  function(err) {
+    console.log(err);
+    // => bad request
+  }
+);
+
+harbor.run("api/user-info", { id: "xxxxxx" }).then(
+  function(resp) {
+    console.log(resp);
+    // => I am from first route for api/user-info, hello from second, request at 1538209634315
+  },
+  function(err) {
+    console.log(err);
+  }
+);
+```
+
+## Usage
+
+### middleware
+
+Before use it, you should know that, every middleware is a function that recieve two parameters `ctx` and `next`:
+
+```js
+function (ctx, next) {
+  // your logic here
+}
+```
+
+`ctx` is an object contains request info:
+
+```js
+{
+  channel: 'channel name',
+  request: 'any request data'
+}
+```
+
+1. You should save your result in `ctx.response`, you will get it in `.run` promise resolve
+2. and you can add your own property to `ctx` to share information between middlewares
+3. call `next` if you want `ctx` be processed by the next middleware, or just `return` to terminate it
+4. use `throw` to throw an error if an error occurred, you will catch it in `.run` promise reject
+
+### Composie()
+
+Create an instance
+
+```js
+const Composie = require("composie");
+// no arguments is needed
+const composie = new Composie();
+```
+
+This libaray is writen in `class`, you should create an instance with `new` before use it
+
+### composie.use(middleware)
+
+Add global middleware, all invoking will proccessed by global middleware
+
+```js
+composie.use(function(ctx, next) {
+  // your logic here
+});
+```
+
+You can add more than more than one global `middleware`, they will run by the order you adding.
+
+### composie.use(channelPrefix, middleware)
+
+Add a middleware for channel has specific prefix, when run the middleware, if the channel match the prefix, then will be processed by the that middleware.
+
+```js
+composie.use("api", function(ctx, next) {
+  // your logic here
+});
+```
+
+You can also add as many middlewares as you want for one prefix.
+
+### composie.route(channel, middleware, [middleware...])
+
+Add middlewares for a specific channel, you can add more than one at a time.
+
+```js
+compose.route(
+  "api/user",
+  function(ctx, next) {
+    // your logic here
+  },
+  function(ctx, next) {
+    // another middleware
+  }
+);
+```
+
+### composie.route({channel: [middleware...]})
+
+Add middlewares for more than one channel
+
+```js
+compose.route({
+  "api/user": function(ctx, next) {
+    // your logic here
+  },
+  "api/detail": [
+    function(ctx, next) {
+      // your logic here
+    },
+    function(ctx, next) {
+      // another middleware
+    }
+  ]
+});
+```
+
+### composie.run(channel, request)
+
+run middleware for `channel`, it will return a promise
+
+```js
+compose.run("api/user", { id: "xxx" });
+```
