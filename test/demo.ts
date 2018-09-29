@@ -1,8 +1,8 @@
-const Composie = require('composie')
+import Composie from '../src/composie'
 const harbor = new Composie()
 harbor.use(function (ctx, next) {
   console.log('request from channel', ctx.channel)
-  if (ctx.request.cmd === 'danger') {
+  if (ctx.request && ctx.request.cmd === 'danger') {
     ctx.response = 'cmd not allowed'
   } else {
     next()
@@ -38,16 +38,15 @@ harbor.route({
   }
 })
 
-harbor
-  .run('api/user-info', { cmd: 'danger' })
-  .then(function (resp) {
-    console.log(resp)
-    // => cmd not allowed
-  })
+// harbor
+//   .run('api/user-info', { cmd: 'danger' })
+//   .then(function (resp) {
+//     console.log(resp)
+//     // => cmd not allowed
+//   })
 
-harbor
-  .run('api/user-info', { cmd: 'danger' })
-  .then(function (resp) {
-    console.log(resp)
-    // => cmd not allowed
-  })
+harbor.run('view/home').then((resp) => {
+  console.log('view success', resp)
+}).catch((err) => {
+  console.log('view error', err)
+})

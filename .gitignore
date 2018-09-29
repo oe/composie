@@ -62,3 +62,6 @@ typings/
 
 # rollup plugin typescript 2
 .rpt2_cache
+
+# local test file
+test/web

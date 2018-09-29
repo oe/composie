@@ -1,6 +1,6 @@
 {
   "name": "composie",
-  "version": "0.0.2",
+  "version": "0.0.6",
   "description": "compose middleware with router and run it like a charm",
   "main": "dist/composie.umd.js",
   "module": "dist/composie.es.js",
@@ -8,9 +8,10 @@
   "scripts": {
     "dev": "npm run build:dir",
     "build": "npm run lint && npm run build:dir",
+    "postbuild": "node ./build/update-pkg-version.js",
     "build:dir": "npm run clean:builddir && rollup -c --environment format:umd && rollup -c --environment format:es",
     "clean:builddir": "rimraf dist/*",
-    "postpublish": "./post-publish2npm.sh",
+    "postpublish": "./build/post-publish2npm.sh",
     "test": "jest --coverage",
     "test:server": "jest --coverage --watch",
     "lint": "tslint --project ./tsconfig.json --config tslint.json"
@@ -42,6 +43,7 @@
     "rollup": "0.55.3",
     "rollup-plugin-typescript2": "^0.16.1",
     "ts-jest": "^23.0.1",
+    "ts-node": "^7.0.1",
     "tslint": "^5.11.0",
     "tslint-config-prettier": "^1.14.0",
     "tslint-config-standard": "^7.1.0",

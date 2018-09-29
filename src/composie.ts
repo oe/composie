@@ -100,21 +100,22 @@ export default class Composie {
    * listen original message event
    * @param evt message event 
    */
-  async run (channel: any, data?: any) {
+  run (channel: any, data?: any) {
     // @ts-ignore
     const ctx = this.createContext(...arguments)
     const method = ctx.channel
     const cbs = this.getMiddlewares(method)
     const routerCbs = this.routers[method] || []
     cbs.push(...routerCbs)
-    if (cbs.length) {
-      const fnMiddlewars = this.composeMiddlewares(cbs)
-      await fnMiddlewars(ctx)
-      return ctx.response
-    } else {
-      console.warn(`no corresponding router for ${channel}`)
-      return
-    }
+    return new Promise((resolve, reject) => {
+      if (cbs.length) {
+        const fnMiddlewars = this.composeMiddlewares(cbs)
+        fnMiddlewars(ctx).then(() => resolve(ctx.response)).catch(reject)
+      } else {
+        console.warn(`no corresponding router for ${channel}`)
+        resolve()
+      }
+    })
   }
 
   /**
@@ -199,6 +200,7 @@ export default class Composie {
   /**
    * compose middlewares into one function
    *  copy form https://github.com/koajs/compose/blob/master/index.js
+   *  made some tiny changes
    * @param middlewares middlewares
    */
   protected composeMiddlewares (middlewares: IMiddleware[]) {
@@ -207,16 +209,14 @@ export default class Composie {
       let index = -1
       return dispatch(0)
       function dispatch (i) {
-        if (i <= index) return Promise.reject(new Error('next() called multiple times'))
+        if (i <= index) {
+          return Promise.reject(new Error('next() called multiple times'))
+        }
         index = i
         let fn: Function | undefined = middlewares[i]
         if (i === middlewares.length) fn = next
         if (!fn) return Promise.resolve()
-        try {
-          return Promise.resolve(fn(context, dispatch.bind(null, i + 1)))
-        } catch (err) {
-          return Promise.reject(err)
-        }
+        return Promise.resolve(fn(context, dispatch.bind(null, i + 1)))
       }
     }
   }

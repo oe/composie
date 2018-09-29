@@ -45,7 +45,7 @@ export default class Composie {
      * listen original message event
      * @param evt message event
      */
-    run(channel: any, data?: any): Promise<any>;
+    run(channel: any, data?: any): Promise<{}>;
     /**
      * add a prefix for a channel
      * @param channel channel prefix
@@ -55,6 +55,7 @@ export default class Composie {
     /**
      * compose middlewares into one function
      *  copy form https://github.com/koajs/compose/blob/master/index.js
+     *  made some tiny changes
      * @param middlewares middlewares
      */
     protected composeMiddlewares(middlewares: IMiddleware[]): (context: IContext, next?: Function | undefined) => Promise<any>;

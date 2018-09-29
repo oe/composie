@@ -1,5 +1,5 @@
 /*!
- * Composie v0.0.2
+ * Composie v0.0.6
  * Copyright© 2018 Saiya https://github.com/evecalm/composie#readme
  */
 (function (global, factory) {
@@ -7,43 +7,6 @@
 	typeof define === 'function' && define.amd ? define(factory) :
 	(global.Composie = factory());
 }(this, (function () { 'use strict';
-
-/*! *****************************************************************************
-Copyright (c) Microsoft Corporation. All rights reserved.
-Licensed under the Apache License, Version 2.0 (the "License"); you may not use
-this file except in compliance with the License. You may obtain a copy of the
-License at http://www.apache.org/licenses/LICENSE-2.0
-
-THIS CODE IS PROVIDED ON AN *AS IS* BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
-KIND, EITHER EXPRESS OR IMPLIED, INCLUDING WITHOUT LIMITATION ANY IMPLIED
-WARRANTIES OR CONDITIONS OF TITLE, FITNESS FOR A PARTICULAR PURPOSE,
-MERCHANTABLITY OR NON-INFRINGEMENT.
-
-See the Apache Version 2.0 License for specific language governing permissions
-and limitations under the License.
-***************************************************************************** */
-/* global Reflect, Promise */
-
-
-
-
-
-
-
-
-
-
-
-
-
-function __awaiter(thisArg, _arguments, P, generator) {
-    return new (P || (P = Promise))(function (resolve, reject) {
-        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
-        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : new P(function (resolve) { resolve(result.value); }).then(fulfilled, rejected); }
-        step((generator = generator.apply(thisArg, _arguments || [])).next());
-    });
-}
 
 function getUniqID() {
     // if (typeof Symbol === 'function') {
@@ -104,21 +67,20 @@ class Composie {
      * @param evt message event
      */
     run(channel, data) {
-        return __awaiter(this, arguments, void 0, function* () {
-            // @ts-ignore
-            const ctx = this.createContext(...arguments);
-            const method = ctx.channel;
-            const cbs = this.getMiddlewares(method);
-            const routerCbs = this.routers[method] || [];
-            cbs.push(...routerCbs);
+        // @ts-ignore
+        const ctx = this.createContext(...arguments);
+        const method = ctx.channel;
+        const cbs = this.getMiddlewares(method);
+        const routerCbs = this.routers[method] || [];
+        cbs.push(...routerCbs);
+        return new Promise((resolve, reject) => {
             if (cbs.length) {
                 const fnMiddlewars = this.composeMiddlewares(cbs);
-                yield fnMiddlewars(ctx);
-                return ctx.response;
+                fnMiddlewars(ctx).then(() => resolve(ctx.response)).catch(reject);
             }
             else {
                 console.warn(`no corresponding router for ${channel}`);
-                return;
+                resolve();
             }
         });
     }
@@ -204,6 +166,7 @@ class Composie {
     /**
      * compose middlewares into one function
      *  copy form https://github.com/koajs/compose/blob/master/index.js
+     *  made some tiny changes
      * @param middlewares middlewares
      */
     composeMiddlewares(middlewares) {
@@ -212,20 +175,16 @@ class Composie {
             let index = -1;
             return dispatch(0);
             function dispatch(i) {
-                if (i <= index)
+                if (i <= index) {
                     return Promise.reject(new Error('next() called multiple times'));
+                }
                 index = i;
                 let fn = middlewares[i];
                 if (i === middlewares.length)
                     fn = next;
                 if (!fn)
                     return Promise.resolve();
-                try {
-                    return Promise.resolve(fn(context, dispatch.bind(null, i + 1)));
-                }
-                catch (err) {
-                    return Promise.reject(err);
-                }
+                return Promise.resolve(fn(context, dispatch.bind(null, i + 1)));
             }
         };
     }
