@@ -1,5 +1,5 @@
 /*!
- * trancate-html v1.0.1
+ * Composie v0.0.2
  * Copyright© 2018 Saiya https://github.com/evecalm/composie#readme
  */
 /*! *****************************************************************************
@@ -49,7 +49,7 @@ function getUniqID() {
 /**
  * Call Router
  */
-class Router {
+class Composie {
     constructor() {
         this.wildcard = getUniqID();
         // global middlewares
@@ -256,4 +256,4 @@ class Router {
     }
 }
 
-export default Router;
+export default Composie;

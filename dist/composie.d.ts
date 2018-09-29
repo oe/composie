@@ -20,7 +20,7 @@ export interface IContext {
 /**
  * Call Router
  */
-export default class Router {
+export default class Composie {
     private wildcard;
     private middlewares;
     private routers;

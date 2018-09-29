@@ -4,9 +4,9 @@ import pkg from "./package.json";
 export default {
   input: "src/composie.ts",
   output: {
-    name: "composie",
+    name: "Composie",
     banner: `/*!
- * composie v${pkg.version}
+ * Composie v${pkg.version}
  * Copyright© ${new Date().getFullYear()} Saiya ${pkg.homepage}
  */`,
     format: process.env.format,

@@ -1,11 +1,11 @@
 /*!
- * trancate-html v1.0.1
+ * Composie v0.0.2
  * Copyright© 2018 Saiya https://github.com/evecalm/composie#readme
  */
 (function (global, factory) {
 	typeof exports === 'object' && typeof module !== 'undefined' ? module.exports = factory() :
 	typeof define === 'function' && define.amd ? define(factory) :
-	(global.composie = factory());
+	(global.Composie = factory());
 }(this, (function () { 'use strict';
 
 /*! *****************************************************************************
@@ -55,7 +55,7 @@ function getUniqID() {
 /**
  * Call Router
  */
-class Router {
+class Composie {
     constructor() {
         this.wildcard = getUniqID();
         // global middlewares
@@ -262,6 +262,6 @@ class Router {
     }
 }
 
-return Router;
+return Composie;
 
 })));
