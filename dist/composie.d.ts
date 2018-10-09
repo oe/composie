@@ -42,10 +42,18 @@ export default class Composie {
      */
     route(channel: string, ...cbs: IMiddleware[]): any;
     /**
-     * listen original message event
-     * @param evt message event
+     * run middlewares
+     *
+     * @param ctx custom context as defined in interface IContext
      */
-    run(channel: any, data?: any): Promise<{}>;
+    run(ctx: IContext): any;
+    /**
+     * run middlewares
+     *
+     * @param channel channel to run
+     * @param data ctx.request when run
+     */
+    run(channel: string, data: any): any;
     /**
      * add a prefix for a channel
      * @param channel channel prefix
@@ -63,7 +71,7 @@ export default class Composie {
      * create context used by middleware
      * @param evt message event
      */
-    protected createContext(channel: any, data: any): IContext;
+    protected createContext(channel: string, data: any): IContext;
     /**
      * get all middlewares match the channel
      * @param channel channel name

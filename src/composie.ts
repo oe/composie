@@ -97,12 +97,25 @@ export default class Composie {
   }
 
   /**
-   * listen original message event
-   * @param evt message event 
+   * run middlewares
+   * 
+   * @param ctx custom context as defined in interface IContext
    */
-  run (channel: any, data?: any) {
-    // @ts-ignore
-    const ctx = this.createContext(...arguments)
+  run (ctx: IContext)
+  /**
+   * run middlewares
+   * 
+   * @param channel channel to run
+   * @param data ctx.request when run
+   */
+  run (channel: string, data: any)
+  run (channel: string | IContext, data?: any) {
+    let ctx: IContext
+    if (typeof channel === 'string') {
+      ctx = this.createContext(channel, data)
+    } else {
+      ctx = channel
+    }
     const method = ctx.channel
     const cbs = this.getMiddlewares(method)
     const routerCbs = this.routers[method] || []
@@ -225,10 +238,10 @@ export default class Composie {
    * create context used by middleware
    * @param evt message event
    */
-  protected createContext (channel: any, data: any) {
+  protected createContext (channel: string, data: any) {
     const context = {
       channel: channel,
-      request: data,
+      request: data
     } as IContext
     return context
   }

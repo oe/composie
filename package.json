@@ -1,6 +1,6 @@
 {
   "name": "composie",
-  "version": "0.0.8",
+  "version": "0.0.11",
   "description": "compose middleware with router and run it like a charm",
   "main": "dist/composie.umd.js",
   "module": "dist/composie.es.js",

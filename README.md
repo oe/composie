@@ -17,6 +17,8 @@
 
 This is a koa & koa-routers like library that enable you compose middleware and run it easily.
 
+This library has no dependence, you can run it both in nodejs and browser.
+
 ## Install
 
 ```sh
@@ -185,10 +187,37 @@ compose.route({
 });
 ```
 
-### composie.run(channel, request)
+### composie.run(channel, request?)
 
 run middleware for `channel`, it will return a promise
 
 ```js
-compose.run("api/user", { id: "xxx" });
+compose.run("api/user", { id: "xxx" }).then(
+  resp => {
+    console.log("response ", resp);
+  },
+  err => {
+    console.log("error", err);
+  }
+);
+```
+
+### composie.run(context)
+
+run middleware with custom `context`, a valid context must contain a string `channel` and an optional `request`.
+
+```js
+compose
+  .run({
+    channel: "api/user",
+    request: { id: "xxx" }
+  })
+  .then(
+    resp => {
+      console.log("response ", resp);
+    },
+    err => {
+      console.log("error", err);
+    }
+  );
 ```

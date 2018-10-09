@@ -1,5 +1,5 @@
 /*!
- * Composie v0.0.8
+ * Composie v0.0.11
  * Copyright© 2018 Saiya https://github.com/evecalm/composie#readme
  */
 (function (global, factory) {
@@ -62,13 +62,14 @@ class Composie {
         });
         return this;
     }
-    /**
-     * listen original message event
-     * @param evt message event
-     */
     run(channel, data) {
-        // @ts-ignore
-        const ctx = this.createContext(...arguments);
+        let ctx;
+        if (typeof channel === 'string') {
+            ctx = this.createContext(channel, data);
+        }
+        else {
+            ctx = channel;
+        }
         const method = ctx.channel;
         const cbs = this.getMiddlewares(method);
         const routerCbs = this.routers[method] || [];
@@ -195,7 +196,7 @@ class Composie {
     createContext(channel, data) {
         const context = {
             channel: channel,
-            request: data,
+            request: data
         };
         return context;
     }
