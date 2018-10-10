@@ -1,12 +1,12 @@
 {
   "name": "composie",
-  "version": "0.0.11",
+  "version": "0.0.12",
   "description": "compose middleware with router and run it like a charm",
   "main": "dist/composie.umd.js",
   "module": "dist/composie.es.js",
   "typings": "dist/composie.d.ts",
   "scripts": {
-    "dev": "npm run build:dir",
+    "dev": "parcel test/web/index.html --out-dir test/cache",
     "build": "npm run lint && npm run build:dir",
     "postbuild": "node ./build/update-pkg-version.js",
     "build:dir": "npm run clean:builddir && rollup -c --environment format:umd && rollup -c --environment format:es",
@@ -39,6 +39,7 @@
     "@types/jest": "^23.3.1",
     "@types/node": "^10.5.5",
     "jest": "22.1.4",
+    "parcel-bundler": "^1.10.2",
     "rimraf": "2.6.2",
     "rollup": "0.55.3",
     "rollup-plugin-typescript2": "^0.16.1",

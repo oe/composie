@@ -65,3 +65,5 @@ typings/
 
 # local test file
 test/web
+.cache
+test/cache

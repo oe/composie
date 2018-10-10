@@ -1,6 +1,6 @@
 /** middleware define */
 export interface IMiddleware {
-    (ctx: any, next: Function): any;
+    (ctx: IContext, next: Function): any;
 }
 /** worker route map */
 export interface IRouters {

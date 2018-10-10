@@ -1,5 +1,5 @@
 /*!
- * Composie v0.0.11
+ * Composie v0.0.12
  * Copyright© 2018 Saiya https://github.com/evecalm/composie#readme
  */
 (function (global, factory) {
@@ -8,19 +8,13 @@
 	(global.Composie = factory());
 }(this, (function () { 'use strict';
 
-function getUniqID() {
-    // if (typeof Symbol === 'function') {
-    //   return Symbol(key)
-    // } else {
-    return Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2);
-    // }
-}
 /**
  * Call Router
  */
 class Composie {
     constructor() {
-        this.wildcard = getUniqID();
+        // get a uuid
+        this.wildcard = Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2);
         // global middlewares
         this.middlewares = {};
         // router map

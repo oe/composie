@@ -1,6 +1,6 @@
 /** middleware define */
 export interface IMiddleware {
-  (ctx: any, next: Function): any
+  (ctx: IContext, next: Function): any
 }
 
 interface IGlobalMiddleware {
@@ -28,19 +28,12 @@ export interface IContext {
   [k: number]: any
 }
 
-function getUniqID () {
-  // if (typeof Symbol === 'function') {
-  //   return Symbol(key)
-  // } else {
-  return Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2)
-  // }
-}
-
 /**
  * Call Router
  */
 export default class Composie {
-  private wildcard = getUniqID()
+  // get a uuid
+  private wildcard = Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2)
   // global middlewares
   private middlewares: IGlobalMiddleware = {}
   // router map
