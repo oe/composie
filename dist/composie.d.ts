@@ -53,7 +53,7 @@ export default class Composie {
      * @param channel channel to run
      * @param data ctx.request when run
      */
-    run(channel: string, data: any): any;
+    run(channel: string, data?: any): any;
     /**
      * add a prefix for a channel
      * @param channel channel prefix

@@ -1,6 +1,6 @@
 {
   "name": "composie",
-  "version": "0.0.12",
+  "version": "0.0.13",
   "description": "compose middleware with router and run it like a charm",
   "main": "dist/composie.umd.js",
   "module": "dist/composie.es.js",
@@ -36,6 +36,8 @@
   },
   "homepage": "https://github.com/evecalm/composie#readme",
   "devDependencies": {
+    "@babel/core": "^7.1.2",
+    "@babel/plugin-transform-runtime": "^7.1.0",
     "@types/jest": "^23.3.1",
     "@types/node": "^10.5.5",
     "jest": "22.1.4",
@@ -48,6 +50,7 @@
     "tslint": "^5.11.0",
     "tslint-config-prettier": "^1.14.0",
     "tslint-config-standard": "^7.1.0",
+    "@babel/runtime-corejs2": "^7.1.2",
     "typescript": "^3.0.1"
   },
   "jest": {

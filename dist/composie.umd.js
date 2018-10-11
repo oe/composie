@@ -1,5 +1,5 @@
 /*!
- * Composie v0.0.12
+ * Composie v0.0.13
  * Copyright© 2018 Saiya https://github.com/evecalm/composie#readme
  */
 (function (global, factory) {
@@ -179,7 +179,12 @@ class Composie {
                     fn = next;
                 if (!fn)
                     return Promise.resolve();
-                return Promise.resolve(fn(context, dispatch.bind(null, i + 1)));
+                try {
+                    return Promise.resolve(fn(context, dispatch.bind(null, i + 1)));
+                }
+                catch (error) {
+                    return Promise.reject(error);
+                }
             }
         };
     }

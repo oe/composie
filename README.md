@@ -6,6 +6,9 @@
     <img src="https://travis-ci.org/evecalm/composie.svg?branch=master" alt="Travis CI">
   </a>
   <a href="#readme">
+    <img src="https://badges.frapsoft.com/typescript/code/typescript.png?v=101" alt="code with typescript" height="18">
+  </a>
+  <a href="#readme">
     <img src="https://badge.fury.io/js/composie.svg" alt="npm version" height="18">
   </a>
   <a href="https://www.npmjs.com/package/composie">
@@ -40,17 +43,17 @@ composie
   // add a global middleware to log
   .use(function(ctx, next) {
     console.log("request from channel", ctx.channel);
-    next();
+    return next();
   })
   // add a global middleware to validate request data
   .use(function(ctx, next) {
     if (!ctx.request) throw new Error("bad request");
-    next();
+    return next();
   })
   // add middleware for channel with prefix 'api/'
   .use("api/", function(ctx, next) {
     ctx.from = +new Date();
-    next();
+    return next();
   })
   // add a router for channel 'api/user-info'
   .route("api/user-info", function(ctx, next) {
@@ -112,7 +115,7 @@ function (ctx, next) {
 
 1. You should save your result in `ctx.response`, you will get it in `.run` promise resolve
 2. and you can add your own property to `ctx` to share information between middlewares
-3. call `next` if you want `ctx` be processed by the next middleware, or just `return` to terminate it
+3. **use `return next()` or `await next()`(in async function) if you want `ctx` be processed by the next middleware, or just `return` to terminate it**
 4. use `throw` to throw an error if an error occurred, you will catch it in `.run` promise reject
 
 ### Composie()

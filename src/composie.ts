@@ -101,7 +101,7 @@ export default class Composie {
    * @param channel channel to run
    * @param data ctx.request when run
    */
-  run (channel: string, data: any)
+  run (channel: string, data?: any)
   run (channel: string | IContext, data?: any) {
     let ctx: IContext
     if (typeof channel === 'string') {
@@ -222,7 +222,11 @@ export default class Composie {
         let fn: Function | undefined = middlewares[i]
         if (i === middlewares.length) fn = next
         if (!fn) return Promise.resolve()
-        return Promise.resolve(fn(context, dispatch.bind(null, i + 1)))
+        try {
+          return Promise.resolve(fn(context, dispatch.bind(null, i + 1)))
+        } catch (error) {
+          return Promise.reject(error)
+        }
       }
     }
   }
