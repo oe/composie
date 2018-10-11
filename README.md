@@ -6,13 +6,13 @@
     <img src="https://travis-ci.org/evecalm/composie.svg?branch=master" alt="Travis CI">
   </a>
   <a href="#readme">
-    <img src="https://badges.frapsoft.com/typescript/code/typescript.png?v=101" alt="code with typescript" height="18">
+    <img src="https://badges.frapsoft.com/typescript/code/typescript.svg?v=101" alt="code with typescript" height="20">
   </a>
   <a href="#readme">
-    <img src="https://badge.fury.io/js/composie.svg" alt="npm version" height="18">
+    <img src="https://badge.fury.io/js/composie.svg" alt="npm version" height="20">
   </a>
   <a href="https://www.npmjs.com/package/composie">
-    <img src="https://img.shields.io/npm/dm/composie.svg" alt="npm version" height="18">
+    <img src="https://img.shields.io/npm/dm/composie.svg" alt="npm version" height="20">
   </a>
 </div>
 
