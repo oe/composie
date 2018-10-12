@@ -18,7 +18,7 @@ export interface IContext {
     [k: number]: any;
 }
 /**
- * Call Router
+ * Composie, custructor need no arugments
  */
 export default class Composie {
     private wildcard;

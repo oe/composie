@@ -29,7 +29,7 @@ export interface IContext {
 }
 
 /**
- * Call Router
+ * Composie, custructor need no arugments
  */
 export default class Composie {
   // get a uuid

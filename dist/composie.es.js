@@ -1,9 +1,9 @@
 /*!
- * Composie v0.0.13
+ * Composie v0.0.17
  * Copyright© 2018 Saiya https://github.com/evecalm/composie#readme
  */
 /**
- * Call Router
+ * Composie, custructor need no arugments
  */
 class Composie {
     constructor() {
