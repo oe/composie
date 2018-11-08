@@ -1,5 +1,5 @@
 /*!
- * Composie v0.0.17
+ * Composie v0.0.18
  * Copyright© 2018 Saiya https://github.com/evecalm/composie#readme
  */
 /**

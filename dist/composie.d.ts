@@ -1,4 +1,4 @@
-/** middleware define */
+/** middleware */
 export interface IMiddleware {
     (ctx: IContext, next: Function): any;
 }
@@ -12,8 +12,10 @@ export interface IRouteParam {
 }
 /** request context for middleware */
 export interface IContext {
-    channel: string;
-    request: any;
+    /** request channel */
+    readonly channel: string;
+    /** request data */
+    readonly request: any;
     [k: string]: any;
     [k: number]: any;
 }
