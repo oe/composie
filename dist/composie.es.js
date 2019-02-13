@@ -1,6 +1,6 @@
 /*!
- * Composie v0.0.18
- * Copyright© 2018 Saiya https://github.com/evecalm/composie#readme
+ * Composie v0.0.19
+ * Copyright© 2019 Saiya https://github.com/oe/composie#readme
  */
 /**
  * Composie, custructor need no arugments
@@ -68,7 +68,7 @@ class Composie {
                 fnMiddlewars(ctx).then(() => resolve(ctx.response)).catch(reject);
             }
             else {
-                console.warn(`no corresponding router for ${channel}`);
+                console.warn('no corresponding router for', method);
                 resolve();
             }
         });

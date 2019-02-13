@@ -1,6 +1,6 @@
 {
   "name": "composie",
-  "version": "0.0.18",
+  "version": "0.0.19",
   "description": "compose middleware with router and run it like a charm",
   "main": "dist/composie.umd.js",
   "module": "dist/composie.es.js",
@@ -17,7 +17,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://evecalm@github.com/evecalm/composie.git"
+    "url": "git+https://oe@github.com/oe/composie.git"
   },
   "keywords": [
     "compose",
@@ -27,13 +27,13 @@
   ],
   "author": {
     "name": "Saiya",
-    "url": "https://github.com/evecalm"
+    "url": "https://github.com/oe"
   },
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/evecalm/composie/issues"
+    "url": "https://github.com/oe/composie/issues"
   },
-  "homepage": "https://github.com/evecalm/composie#readme",
+  "homepage": "https://github.com/oe/composie#readme",
   "devDependencies": {
     "@babel/core": "^7.1.2",
     "@babel/plugin-transform-runtime": "^7.1.0",

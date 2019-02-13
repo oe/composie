@@ -120,7 +120,7 @@ export default class Composie {
         const fnMiddlewars = this.composeMiddlewares(cbs)
         fnMiddlewars(ctx).then(() => resolve(ctx.response)).catch(reject)
       } else {
-        console.warn(`no corresponding router for ${channel}`)
+        console.warn('no corresponding router for', method)
         resolve()
       }
     })
