@@ -1,5 +1,5 @@
 /*!
- * Composie v0.0.19
+ * Composie v0.1.0
  * Copyright© 2019 Saiya https://github.com/oe/composie#readme
  */
 /**
