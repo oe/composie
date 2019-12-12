@@ -1,12 +1,12 @@
 /*!
- * Composie v0.1.0
+ * Composie v0.1.2
  * Copyright© 2019 Saiya https://github.com/oe/composie#readme
  */
 /**
  * Composie, custructor need no arugments
  */
-class Composie {
-    constructor() {
+var Composie = /** @class */ (function () {
+    function Composie() {
         // get a uuid
         this.wildcard = Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2);
         // global middlewares
@@ -19,8 +19,8 @@ class Composie {
      * @param prefix channel prefix
      * @param cb     middleware
      */
-    use(prefix, cb) {
-        let key;
+    Composie.prototype.use = function (prefix, cb) {
+        var key;
         if (typeof prefix === 'function') {
             cb = prefix;
             key = this.wildcard;
@@ -30,64 +30,69 @@ class Composie {
         }
         this.addMiddleware(key, cb);
         return this;
-    }
-    route(routers, ...cbs) {
-        if (typeof routers === 'string') {
-            routers = {
-                [routers]: cbs
-            };
+    };
+    Composie.prototype.route = function (routers) {
+        var _this = this;
+        var cbs = [];
+        for (var _i = 1; _i < arguments.length; _i++) {
+            cbs[_i - 1] = arguments[_i];
         }
-        Object.keys(routers).forEach((k) => {
-            let cbs = routers[k];
+        var _a;
+        if (typeof routers === 'string') {
+            routers = (_a = {}, _a[routers] = cbs, _a);
+        }
+        Object.keys(routers).forEach(function (k) {
+            var _a;
+            var cbs = routers[k];
             if (!Array.isArray(cbs))
                 cbs = [cbs];
             if (!cbs.length)
                 return;
-            if (!this.routers[k]) {
-                this.routers[k] = [];
+            if (!_this.routers[k]) {
+                _this.routers[k] = [];
             }
-            this.routers[k].push(...cbs);
+            (_a = _this.routers[k]).push.apply(_a, cbs);
         });
         return this;
-    }
-    run(channel, data) {
-        let ctx;
+    };
+    Composie.prototype.run = function (channel, data) {
+        var _this = this;
+        var ctx;
         if (typeof channel === 'string') {
             ctx = this.createContext(channel, data);
         }
         else {
             ctx = channel;
         }
-        const method = ctx.channel;
-        const cbs = this.getMiddlewares(method);
-        const routerCbs = this.routers[method] || [];
-        cbs.push(...routerCbs);
-        return new Promise((resolve, reject) => {
+        var method = ctx.channel;
+        var cbs = this.getMiddlewares(method);
+        var routerCbs = this.routers[method] || [];
+        cbs.push.apply(cbs, routerCbs);
+        return new Promise(function (resolve, reject) {
             if (cbs.length) {
-                const fnMiddlewars = this.composeMiddlewares(cbs);
-                fnMiddlewars(ctx).then(() => resolve(ctx.response)).catch(reject);
+                var fnMiddlewars = _this.composeMiddlewares(cbs);
+                fnMiddlewars(ctx).then(function () { return resolve(ctx.response); }).catch(reject);
             }
             else {
                 console.warn('no corresponding router for', method);
                 resolve();
             }
         });
-    }
+    };
     /**
      * add a prefix for a channel
      * @param channel channel prefix
      * @param cb middleware
      */
-    addMiddleware(channel, cb) {
-        let middlewares = this.middlewares;
+    Composie.prototype.addMiddleware = function (channel, cb) {
+        var _a, _b, _c;
+        var middlewares = this.middlewares;
         if (channel === this.wildcard) {
             if (!this.middlewares[channel]) {
-                this.middlewares = {
-                    [channel]: {
+                this.middlewares = (_a = {}, _a[channel] = {
                         mdlws: [],
                         children: middlewares
-                    }
-                };
+                    }, _a);
             }
             this.middlewares[channel].mdlws.push(cb);
             return;
@@ -96,10 +101,10 @@ class Composie {
             middlewares = this.middlewares[this.wildcard].children;
         }
         while (middlewares) {
-            const keys = Object.keys(middlewares);
-            let len = keys.length;
-            let result = 0;
-            let key = '';
+            var keys = Object.keys(middlewares);
+            var len = keys.length;
+            var result = 0;
+            var key = '';
             while (len--) {
                 key = keys[len];
                 // same channel exists
@@ -134,41 +139,39 @@ class Composie {
                     continue;
                 }
                 // no children, insert as the children
-                middlewares[key].children = { [channel]: { mdlws: [cb] } };
+                middlewares[key].children = (_b = {}, _b[channel] = { mdlws: [cb] }, _b);
                 return;
             }
             // insert node
             if (result === 3) {
-                const item = middlewares[key];
+                var item = middlewares[key];
                 delete middlewares[key];
                 middlewares[channel] = {
                     mdlws: [cb],
-                    children: {
-                        [key]: item
-                    }
+                    children: (_c = {}, _c[key] = item, _c)
                 };
                 return;
             }
         }
         middlewares[channel] = { mdlws: [cb] };
-    }
+    };
     /**
      * compose middlewares into one function
      *  copy form https://github.com/koajs/compose/blob/master/index.js
      *  made some tiny changes
      * @param middlewares middlewares
      */
-    composeMiddlewares(middlewares) {
+    Composie.prototype.composeMiddlewares = function (middlewares) {
         return function (context, next) {
             // last called middleware #
-            let index = -1;
+            var index = -1;
             return dispatch(0);
             function dispatch(i) {
                 if (i <= index) {
                     return Promise.reject(new Error('next() called multiple times'));
                 }
                 index = i;
-                let fn = middlewares[i];
+                var fn = middlewares[i];
                 if (i === middlewares.length)
                     fn = next;
                 if (!fn)
@@ -181,38 +184,39 @@ class Composie {
                 }
             }
         };
-    }
+    };
     /**
      * create context used by middleware
      * @param evt message event
      */
-    createContext(channel, data) {
-        const context = {
+    Composie.prototype.createContext = function (channel, data) {
+        var context = {
             channel: channel,
             request: data
         };
         return context;
-    }
+    };
     /**
      * get all middlewares match the channel
      * @param channel channel name
      */
-    getMiddlewares(channel) {
-        let middlewares = this.middlewares;
-        const result = [];
+    Composie.prototype.getMiddlewares = function (channel) {
+        var middlewares = this.middlewares;
+        var result = [];
         if (middlewares[this.wildcard]) {
-            result.push(...middlewares[this.wildcard].mdlws);
+            result.push.apply(result, middlewares[this.wildcard].mdlws);
             middlewares = middlewares[this.wildcard].children;
         }
         while (middlewares) {
-            const k = Object.keys(middlewares).find(k => channel.indexOf(k) !== -1);
+            var k = Object.keys(middlewares).find(function (k) { return channel.indexOf(k) !== -1; });
             if (k === undefined)
                 break;
-            result.push(...middlewares[k].mdlws);
+            result.push.apply(result, middlewares[k].mdlws);
             middlewares = middlewares[k].children;
         }
         return result;
-    }
-}
+    };
+    return Composie;
+}());
 
 export default Composie;
