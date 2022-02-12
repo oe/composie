@@ -5,16 +5,6 @@
   "main": "dist/composie.umd.js",
   "module": "dist/composie.es.js",
   "typings": "dist/composie.d.ts",
-  "scripts": {
-    "dev": "parcel test/web/index.html --out-dir test/cache",
-    "prebuild": "npm run lint && rimraf dist/*",
-    "build": "rollup -c rollup.config.ts",
-    "postbuild": "ts-node build/update-pkg-version.ts",
-    "postpublish": "./build/post-publish2npm.sh",
-    "test": "jest --coverage",
-    "test:server": "jest --coverage --watch",
-    "lint": "tslint --project ./tsconfig.json --config tslint.json"
-  },
   "repository": {
     "type": "git",
     "url": "git+https://oe@github.com/oe/composie.git"
@@ -35,37 +25,6 @@
   },
   "homepage": "https://github.com/oe/composie#readme",
   "devDependencies": {
-    "@babel/core": "^7.1.2",
-    "@babel/plugin-transform-runtime": "^7.1.0",
-    "@babel/runtime-corejs2": "^7.1.2",
-    "@types/jest": "^23.3.1",
-    "@types/node": "^10.5.5",
-    "jest": "22.1.4",
-    "parcel-bundler": "^1.10.2",
-    "rimraf": "2.6.2",
-    "rollup": "0.55.3",
-    "rollup-plugin-typescript2": "^0.16.1",
-    "ts-jest": "^23.0.1",
-    "ts-node": "^7.0.1",
-    "tslint": "^5.11.0",
-    "tslint-config-prettier": "^1.14.0",
-    "tslint-config-standard": "^7.1.0",
-    "typescript": "^3.0.1"
-  },
-  "jest": {
-    "transform": {
-      "^.+\\.tsx?$": "ts-jest"
-    },
-    "verbose": true,
-    "testURL": "http://localhost/",
-    "testRegex": "(/__tests__/.*|(\\.|/)(test|spec))\\.(jsx?|tsx?)$",
-    "moduleFileExtensions": [
-      "ts",
-      "tsx",
-      "js",
-      "jsx",
-      "json",
-      "node"
-    ]
+    "typescript": "^4.5.5"
   }
 }

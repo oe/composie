@@ -40,6 +40,9 @@ export default class Composie {
   private middlewares: IGlobalMiddleware = {}
   // router map
   private routers: IRouters = {}
+  constructor () {
+
+  }
   /**
    * add global middleware
    * @param cb middleware
@@ -117,11 +120,11 @@ export default class Composie {
     cbs.push(...routerCbs)
     return new Promise((resolve, reject) => {
       if (cbs.length) {
-        const fnMiddlewars = this.composeMiddlewares(cbs)
-        fnMiddlewars(ctx).then(() => resolve(ctx.response)).catch(reject)
+        const fnMiddlewares = this.composeMiddlewares(cbs)
+        fnMiddlewares(ctx).then(() => resolve(ctx.response)).catch(reject)
       } else {
         console.warn('no corresponding router for', method)
-        resolve()
+        resolve(undefined)
       }
     })
   }
