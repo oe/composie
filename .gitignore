@@ -67,3 +67,4 @@ typings/
 # local test file
 .cache
 test/cache
+.parcel-cache
