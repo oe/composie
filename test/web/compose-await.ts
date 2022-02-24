@@ -1,11 +1,5 @@
 import Composie from '../../src/composie'
-const harbor = new Composie((channel, data) => {
-  return {
-    channel,
-    request: data,
-    name: 'title',
-  }
-})
+const harbor = new Composie()
 // wait to get data
 const getData = () => new Promise((resolve, reject) => {
   setTimeout(() => resolve('data retrieved'), 2000)
@@ -33,6 +27,26 @@ function three (ctx, next) {
 
 harbor.use(one).use(two).use(one).use(three)
 
+harbor.route('test', async (ctx, next) => {
+  ctx.response.route = 'with route'
+  // throw new Error('test error')
+  await next()
+  await next()
+})
+
+harbor.route('sync-test', (ctx, next) => {
+  ctx.response = 'with route'
+  throw new Error('test error')
+})
+
+
+
 harbor.run('api/user-info').then((response) => {
   console.log('done', response)
 }, (e) => console.log('failed', e))
+
+harbor.run('test').catch((error) => {
+  console.log('failed', error)
+})
+
+harbor.run('sync-test')

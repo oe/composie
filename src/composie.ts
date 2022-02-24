@@ -26,6 +26,7 @@ export interface IBaseContext {
   readonly channel: string
   /** request data */
   readonly request: any
+  response: any
   // response?: any
   [k: string]: any
   [k: number]: any
@@ -38,11 +39,10 @@ type ICreateContext<C> = (channel: string, data: any) => C
  * @param evt message event
  */
 function defaultCreateContext<T extends IBaseContext> (channel: string, data: any) {
-  const context = {
+  return {
     channel: channel,
-    request: data
+    request: data,
   } as T
-  return context
 }
 
 /**
@@ -58,8 +58,8 @@ export default class Composie<IContext extends IBaseContext> {
   
   private createContext: ICreateContext<IContext>
 
-  constructor (ctx: ICreateContext<IContext> = defaultCreateContext) {
-    this.createContext = ctx
+  constructor (createContext: ICreateContext<IContext> = defaultCreateContext) {
+    this.createContext = createContext
   }
 
   /**
@@ -129,7 +129,6 @@ export default class Composie<IContext extends IBaseContext> {
         const fnMiddlewares = this.composeMiddlewares(cbs)
         fnMiddlewares(ctx).then(() => resolve(ctx.response)).catch(reject)
       } else {
-        console.warn('no corresponding router for', method)
         resolve(undefined)
       }
     })
