@@ -2,8 +2,8 @@
 
 <h5 align="center">compose middleware with router and run it like a charm </h5>
 <div align="center">
-  <a href="https://travis-ci.org/evecalm/composie">
-    <img src="https://travis-ci.org/evecalm/composie.svg?branch=master" alt="Travis CI">
+  <a href="https://github.com/oe/composie/actions/workflows/pages.yml">
+    <img src="https://github.com/oe/composie/actions/workflows/pages.yml/badge.svg" alt="Github Workflow">
   </a>
   <a href="#readme">
     <img src="https://badges.frapsoft.com/typescript/code/typescript.svg?v=101" alt="code with typescript" height="20">

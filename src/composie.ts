@@ -1,57 +1,79 @@
 /** middleware */
-export interface IMiddleware {
-  (ctx: IContext, next: Function): any
+export interface IMiddleware<C> {
+  (ctx: C, next: Function): any
 }
 
-interface IGlobalMiddleware {
+interface IGlobalMiddleware<C> {
   [k: string]: {
-    mdlws: IMiddleware[],
-    children?: IGlobalMiddleware
+    mdlws: IMiddleware<C>[],
+    children?: IGlobalMiddleware<C>
   }
 }
 
 /** worker route map */
-export interface IRouters {
-  [k: string]: IMiddleware[]
+export interface IRouters<C> {
+  [k: string]: IMiddleware<C>[]
 }
 
 /** param for route */
-export interface IRouteParam {
-  [k: string]: IMiddleware[] | IMiddleware
+export interface IRouteParam<C> {
+  [k: string]: IMiddleware<C>[] | IMiddleware<C>
 }
 
 /** request context for middleware */
-export interface IContext {
+export interface IBaseContext {
   /** request channel */
   readonly channel: string
   /** request data */
   readonly request: any
+  response: any
+  // response?: any
   [k: string]: any
   [k: number]: any
+}
+
+type ICreateContext<C> = (channel: string, data: any) => C
+
+/**
+ * create context used by middleware
+ * @param evt message event
+ */
+function defaultCreateContext<T extends IBaseContext> (channel: string, data: any) {
+  return {
+    channel: channel,
+    request: data,
+  } as T
 }
 
 /**
  * Composie, custructor need no arugments
  */
-export default class Composie {
+export default class Composie<IContext extends IBaseContext> {
   // get a uuid
   private wildcard = Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2)
   // global middlewares
-  private middlewares: IGlobalMiddleware = {}
+  private middlewares: IGlobalMiddleware<IContext> = {}
   // router map
-  private routers: IRouters = {}
+  private routers: IRouters<IContext> = {}
+  
+  private createContext: ICreateContext<IContext>
+
+  constructor (createContext: ICreateContext<IContext> = defaultCreateContext) {
+    this.createContext = createContext
+  }
+
   /**
    * add global middleware
    * @param cb middleware
    */
-  use (cb: IMiddleware)
-  use (prefix: string, cb: IMiddleware)
+  use (cb: IMiddleware<IContext>)
+  use (prefix: string, cb: IMiddleware<IContext>)
   /**
    * add global middleware foucs on specifc channel prefix
    * @param prefix channel prefix
    * @param cb     middleware
    */
-  use (prefix: string | IMiddleware, cb?: IMiddleware) {
+  use (prefix: string | IMiddleware<IContext>, cb?: IMiddleware<IContext>) {
     let key: string | Symbol
     if (typeof prefix === 'function') {
       cb = prefix
@@ -66,14 +88,14 @@ export default class Composie {
    * add router
    * @param routers router map
    */
-  route (routers: IRouteParam)
+  route (routers: IRouteParam<IContext>)
   /**
    * add router
    * @param channel channel name
    * @param cbs channel handlers
    */
-  route (channel: string, ...cbs: IMiddleware[])
-  route (routers: IRouteParam | string, ...cbs: IMiddleware[]) {
+  route (channel: string, ...cbs: IMiddleware<IContext>[])
+  route (routers: IRouteParam<IContext> | string, ...cbs: IMiddleware<IContext>[]) {
     if (typeof routers === 'string') {
       routers = {
         [routers]: cbs
@@ -90,38 +112,24 @@ export default class Composie {
     })
     return this
   }
-
-  /**
-   * run middlewares
-   * 
-   * @param ctx custom context as defined in interface IContext
-   */
-  run (ctx: IContext)
   /**
    * run middlewares
    * 
    * @param channel channel to run
    * @param data ctx.request when run
    */
-  run (channel: string, data?: any)
-  run (channel: string | IContext, data?: any) {
-    let ctx: IContext
-    if (typeof channel === 'string') {
-      ctx = this.createContext(channel, data)
-    } else {
-      ctx = channel
-    }
+  run (channel: string, data?: any) {
+    const ctx: IContext = this.createContext(channel, data)
     const method = ctx.channel
     const cbs = this.getMiddlewares(method)
     const routerCbs = this.routers[method] || []
     cbs.push(...routerCbs)
     return new Promise((resolve, reject) => {
       if (cbs.length) {
-        const fnMiddlewars = this.composeMiddlewares(cbs)
-        fnMiddlewars(ctx).then(() => resolve(ctx.response)).catch(reject)
+        const fnMiddlewares = this.composeMiddlewares(cbs)
+        fnMiddlewares(ctx).then(() => resolve(ctx.response)).catch(reject)
       } else {
-        console.warn('no corresponding router for', method)
-        resolve()
+        resolve(undefined)
       }
     })
   }
@@ -131,7 +139,7 @@ export default class Composie {
    * @param channel channel prefix
    * @param cb middleware
    */
-  protected addMiddleware (channel: string, cb: IMiddleware) {
+  protected addMiddleware (channel: string, cb: IMiddleware<IContext>) {
     let middlewares = this.middlewares
     if (channel === this.wildcard) {
       if (!this.middlewares[channel]) {
@@ -211,7 +219,7 @@ export default class Composie {
    *  made some tiny changes
    * @param middlewares middlewares
    */
-  protected composeMiddlewares (middlewares: IMiddleware[]) {
+  protected composeMiddlewares (middlewares: IMiddleware<IContext>[]) {
     return function (context: IContext, next?: Function) {
       // last called middleware #
       let index = -1
@@ -237,21 +245,21 @@ export default class Composie {
    * create context used by middleware
    * @param evt message event
    */
-  protected createContext (channel: string, data: any) {
-    const context = {
-      channel: channel,
-      request: data
-    } as IContext
-    return context
-  }
+  // protected createContext (channel: string, data: any) {
+  //   const context = {
+  //     channel: channel,
+  //     request: data
+  //   } as IContext
+  //   return context
+  // }
 
   /**
    * get all middlewares match the channel
    * @param channel channel name
    */
   private getMiddlewares (channel: string) {
-    let middlewares: IGlobalMiddleware | undefined = this.middlewares
-    const result: IMiddleware[] = []
+    let middlewares: IGlobalMiddleware<IContext> | undefined = this.middlewares
+    const result: IMiddleware<IContext>[] = []
     if (middlewares[this.wildcard]) {
       result.push(...middlewares[this.wildcard].mdlws)
       middlewares = middlewares[this.wildcard].children
