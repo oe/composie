@@ -8,7 +8,7 @@
   "source": "src/composie.ts",
   "scripts": {
     "clean": "rimraf dist",
-    "prebuild": "npm run clean",
+    "prebuild": "yarn clean && yarn test",
     "build": "parcel build --no-source-maps",
     "dev": "parcel test/web/index.html --open",
     "test": "jest --coverage"
