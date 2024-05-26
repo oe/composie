@@ -1,4 +1,4 @@
-import Composie from '../src/composie';
+import Composie, { ComposieError, COMPOSIE_ERROR_CODES } from '../src/composie';
 
 describe('simple route', () => {
   const createComposie = (withDefaultMiddleware = true) => {
@@ -13,7 +13,7 @@ describe('simple route', () => {
     }
     return composie
   }
-  
+
   it('should run simple route', async () => {
     const composie = createComposie()
     composie.route('test', (ctx, next) => {
@@ -144,6 +144,45 @@ describe('multi route', () => {
     composie.route({
       'test': [],
     })
+    const response = await composie.run('test')
+    expect(response).toBeUndefined()
+  })
+
+  it('should get undefined with empty route array', async () => {
+    const composie = new Composie({})
+    composie.route({
+      'test': [],
+    })
+    const response = await composie.run('test')
+    expect(response).toBeUndefined()
+  })
+})
+
+
+describe('route not found', () => {
+  it('should throw error when route not found', async () => {
+    const composie = new Composie({
+      throwWhenNoRoute: true
+    })
+    return expect(composie.run('test')).rejects.toThrow()
+  })
+
+  it('should throw error when route not found with throwWhenNoRoute', async () => {
+    const composie = new Composie()
+    // @ts-ignore
+    composie.throwWhenNoRoute = true
+    try {
+      await composie.run('test')
+    } catch (error) {
+      expect(error).toBeInstanceOf(ComposieError)
+      expect((error as ComposieError).code).toBe(ComposieError.CODES.ROUTE_NOT_FOUND)
+    }
+  })
+
+  it('should not throw error when route not found with throwWhenNoRoute false', async () => {
+    const composie = new Composie()
+    // @ts-ignore
+    composie.throwWhenNoRoute = false
     const response = await composie.run('test')
     expect(response).toBeUndefined()
   })

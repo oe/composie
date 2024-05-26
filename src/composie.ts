@@ -46,6 +46,57 @@ function createDefaultContext<T extends IBaseContext> (channel: string, data: an
 }
 
 /**
+ * composie error codes
+ */
+export const COMPOSIE_ERROR_CODES = {
+  /**
+   * route not found
+   */
+  ROUTE_NOT_FOUND: 'ROUTE_NOT_FOUND',
+  /**
+   * unknown error
+   */
+  UNKNOWN: 'UNKNOWN'
+} as const
+
+export interface IComposieErrorOptions {
+  code: string
+  message: string
+  originalError?: Error
+  data?: unknown
+}
+
+/**
+ * Composie error class
+ */
+export class ComposieError extends Error {
+  code: string
+  originalError: Error
+  data?: unknown
+  constructor (options: IComposieErrorOptions) {
+    super(options.message)
+    this.code = options.code
+    this.originalError = options.originalError || new Error(options.message)
+    this.data = options.data
+    this.name = 'ComposieError'
+  }
+
+  static CODES = COMPOSIE_ERROR_CODES
+}
+
+
+/**
+ * Composie options
+ */
+export type IComposieOptions<IContext> = {
+  createContext?: ICreateContext<IContext>
+  /**
+   * throw when no route found, default is false
+   */
+  throwWhenNoRoute?: boolean
+} | ICreateContext<IContext>
+
+/**
  * generate a uuid, if crypto.randomUUID exists, use it, otherwise generate a random string
  * @returns uuid
  */
@@ -67,8 +118,16 @@ export default class Composie<IContext extends IBaseContext> {
 
   private createContext: ICreateContext<IContext>
 
-  constructor (createContext: ICreateContext<IContext> = createDefaultContext) {
-    this.createContext = createContext
+  private throwWhenNoRoute: boolean
+
+  constructor (options: IComposieOptions<IContext> = createDefaultContext) {
+    if (typeof options === 'function') {
+      this.createContext = options
+      this.throwWhenNoRoute = false
+    } else {
+      this.createContext = options.createContext || createDefaultContext
+      this.throwWhenNoRoute = options.throwWhenNoRoute || false
+    }
   }
 
   /**
@@ -135,8 +194,19 @@ export default class Composie<IContext extends IBaseContext> {
   run (channel: string, data?: any) {
     const ctx: IContext = this.createContext(channel, data)
     const method = ctx.channel
-    const cbs = this.getMiddlewares(method)
     const routerCbs = this.routers[method] || []
+    if (!routerCbs.length) {
+      if (this.throwWhenNoRoute) {
+        routerCbs.push((ctx, next) => {
+          throw new ComposieError({
+            code: COMPOSIE_ERROR_CODES.ROUTE_NOT_FOUND,
+            message: `route ${method} not found`,
+            data: { channel: method, request: ctx.request }
+          })
+        })
+      }
+    }
+    const cbs = this.getMiddlewares(method)
     cbs.push(...routerCbs)
     return new Promise((resolve, reject) => {
       if (cbs.length) {
