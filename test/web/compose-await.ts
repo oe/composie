@@ -4,6 +4,16 @@ const harbor = new Composie()
 const getData = () => new Promise((resolve, reject) => {
   setTimeout(() => resolve('data retrieved'), 2000)
 })
+
+async function fallback(ctx, next) {
+  try {
+    await next()
+  } catch (error) {
+    console.error('error caught', error)
+    console.error('ctx', ctx)
+  }
+}
+
 async function one (ctx, next) {
   console.log('first one, wait for 2s')
   await getData()
@@ -12,7 +22,6 @@ async function one (ctx, next) {
 }
 function two (ctx, next) {
   console.log('the second')
-
   return next()
 }
 function three (ctx, next) {
@@ -25,28 +34,28 @@ function three (ctx, next) {
   return next()
 }
 
-harbor.use(one).use(two).use(one).use(three)
+harbor.use(fallback).use(one).use(two).use(one).use(three)
 
-harbor.route('test', async (ctx, next) => {
+harbor.on('test', async (ctx, next) => {
   ctx.response.route = 'with route'
   // throw new Error('test error')
   await next()
   await next()
 })
 
-harbor.route('sync-test', (ctx, next) => {
+harbor.on('sync-test', (ctx, next) => {
   ctx.response = 'with route'
   throw new Error('test error')
 })
 
 
 
-harbor.run('api/user-info').then((response) => {
+harbor.emit('api/user-info').then((response) => {
   console.log('done', response)
 }, (e) => console.log('failed', e))
 
-harbor.run('test').catch((error) => {
+harbor.emit('test').catch((error) => {
   console.log('failed', error)
 })
 
-harbor.run('sync-test')
+harbor.run('sync-test', 'aaa')

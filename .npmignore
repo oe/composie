@@ -9,3 +9,4 @@ build
 *.sh
 tsconfig.json
 tslint.json
+rollup.config.mjs

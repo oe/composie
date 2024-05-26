@@ -38,7 +38,7 @@ type ICreateContext<C> = (channel: string, data: any) => C
  * create context used by middleware
  * @param evt message event
  */
-function defaultCreateContext<T extends IBaseContext> (channel: string, data: any) {
+function createDefaultContext<T extends IBaseContext> (channel: string, data: any) {
   return {
     channel: channel,
     request: data,
@@ -55,10 +55,10 @@ export default class Composie<IContext extends IBaseContext> {
   private middlewares: IGlobalMiddleware<IContext> = {}
   // router map
   private routers: IRouters<IContext> = {}
-  
+
   private createContext: ICreateContext<IContext>
 
-  constructor (createContext: ICreateContext<IContext> = defaultCreateContext) {
+  constructor (createContext: ICreateContext<IContext> = createDefaultContext) {
     this.createContext = createContext
   }
 
@@ -112,9 +112,14 @@ export default class Composie<IContext extends IBaseContext> {
     })
     return this
   }
+
+  /**
+   * add router, alias of route
+   */
+  on: Composie<IContext>['route'] = this.route
   /**
    * run middlewares
-   * 
+   *
    * @param channel channel to run
    * @param data ctx.request when run
    */
@@ -133,6 +138,11 @@ export default class Composie<IContext extends IBaseContext> {
       }
     })
   }
+
+  /**
+   * run middlewares, alias of run
+   */
+  emit: Composie<IContext>['run'] = this.run
 
   /**
    * add a prefix for a channel
@@ -273,3 +283,4 @@ export default class Composie<IContext extends IBaseContext> {
     return result
   }
 }
+

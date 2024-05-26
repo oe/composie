@@ -22,6 +22,8 @@ This is a koa & koa-routers like library that enable you compose middleware and 
 
 This library has no dependence, you can run it both in nodejs and browser.
 
+You may use it as advanced event-bus with response support.
+
 ## Install
 
 ```sh
@@ -158,6 +160,8 @@ You can also add as many middlewares as you want for one prefix.
 
 Add middlewares for a specific channel, you can add more than one at a time.
 
+`composie.on` is an alias of `composie.route`, use it as you like.
+
 ```js
 compose.route(
   "api/user",
@@ -173,6 +177,8 @@ compose.route(
 ### composie.route({channel: [middleware...]})
 
 Add middlewares for more than one channel
+
+`composie.on` is an alias of `composie.route`, use it as you like.
 
 ```js
 compose.route({
@@ -190,9 +196,37 @@ compose.route({
 });
 ```
 
+### chain `use`, `route` together
+
+You can chain `use` and `route` together
+
+```js
+compose
+  .use(function(ctx, next) {
+    // your logic here
+    // ...
+    return next();
+  })
+  .use("api", function(ctx, next) {
+    // your logic here
+    // ...
+    return next();
+  })
+  .route("api/user", function(ctx, next) {
+    // your logic here
+  })
+  // `on` is an alias of `route`
+  .on("api/detail", function(ctx, next) {
+    // your logic here
+  });
+
+```
+
 ### composie.run(channel, request?)
 
 run middleware for `channel`, it will return a promise
+
+`composie.emit` is an alias of `composie.run`, use it as you like.
 
 ```js
 compose.run("api/user", { id: "xxx" }).then(
@@ -208,6 +242,8 @@ compose.run("api/user", { id: "xxx" }).then(
 ### composie.run(context)
 
 run middleware with custom `context`, a valid context must contain a string `channel` and an optional `request`.
+
+`composie.emit` is an alias of `composie.run`, use it as you like.
 
 ```js
 compose
