@@ -11,7 +11,7 @@ describe('general middleware', () => {
     }
     return composie
   }
-  
+
   it('should run general middleware', async () => {
     const composie = createComposie()
     const response = await composie.run('test')
@@ -25,6 +25,16 @@ describe('general middleware', () => {
     })
     const response = await composie.run('test')
     expect(response).toBe('test')
+  })
+
+  it('should use random to generate wildcard', async () => {
+    const originalRandomUUID = crypto.randomUUID
+    // @ts-ignore
+    crypto.randomUUID = null
+    const composie = createComposie()
+    crypto.randomUUID = originalRandomUUID
+    // @ts-ignore
+    expect(composie.wildcard.replace(/[^-]/g, '').length < 4).toBe(true)
   })
 
   it('should run only one general middleware with next', async () => {
@@ -41,7 +51,7 @@ describe('general middleware', () => {
   })
 })
 
-describe('general middleware with custom context', () => { 
+describe('general middleware with custom context', () => {
   it('simple context', async () => {
     const createContext = (channel: string, data: any) => {
       return {

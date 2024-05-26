@@ -56,9 +56,29 @@ describe('specified middleware', () => {
     expect(response).toBe('api/demo-demo-demo')
   })
 
+  it('should match 2 nest specified middleware when middleware order changed', async () => {
+    const composie = createComposie()
+    composie.use('api/demo', (ctx, next) => {
+      ctx.response += '-demo'
+      return next()
+    })
+    composie.use('api/demo', (ctx, next) => {
+      ctx.response += '-demo'
+      return next()
+    })
+    composie.use('api/', (ctx, next) => {
+      ctx.response = ctx.channel + '-base'
+      return next()
+    })
+    // @ts-ignore
+    console.log('composie.wildcard', composie.wildcard)
+    const response = await composie.run('api/demo')
+    expect(response).toBe('api/demo-base-demo-demo')
+  })
+
   it('add nest middleware in different order', async () => {
     const composie = createComposie()
-    
+
     composie.use('api/demo', (ctx, next) => {
       ctx.response += '-demo'
       return next()

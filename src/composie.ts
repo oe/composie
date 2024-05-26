@@ -46,11 +46,20 @@ function createDefaultContext<T extends IBaseContext> (channel: string, data: an
 }
 
 /**
+ * generate a uuid, if crypto.randomUUID exists, use it, otherwise generate a random string
+ * @returns uuid
+ */
+function getUUID () {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID()
+  return `${Math.random().toString(36)}-${Math.random().toString(36)}`.replace(/\./g, '')
+}
+
+/**
  * Composie, custructor need no arugments
  */
 export default class Composie<IContext extends IBaseContext> {
-  // get a uuid
-  private wildcard = Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2)
+  // use an uuid as the root middleware key
+  private wildcard = getUUID()
   // global middlewares
   private middlewares: IGlobalMiddleware<IContext> = {}
   // router map
@@ -74,7 +83,7 @@ export default class Composie<IContext extends IBaseContext> {
    * @param cb     middleware
    */
   use (prefix: string | IMiddleware<IContext>, cb?: IMiddleware<IContext>) {
-    let key: string | Symbol
+    let key: string
     if (typeof prefix === 'function') {
       cb = prefix
       key = this.wildcard
@@ -152,6 +161,7 @@ export default class Composie<IContext extends IBaseContext> {
   protected addMiddleware (channel: string, cb: IMiddleware<IContext>) {
     let middlewares = this.middlewares
     if (channel === this.wildcard) {
+      // if wildcard not exists, add exist middlewares to wildcard's children
       if (!this.middlewares[channel]) {
         this.middlewares = {
           [channel]: {
@@ -169,56 +179,41 @@ export default class Composie<IContext extends IBaseContext> {
     while (middlewares) {
       const keys = Object.keys(middlewares)
       let len = keys.length
-      let result = 0
-      let key = ''
       while (len--) {
-        key = keys[len]
+        const key = keys[len]
         // same channel exists
         if (key === channel) {
-          result = 1
-          break
+          middlewares[key].mdlws.push(cb)
+          return
         }
         // existing tree contains channel
+        //  e.g. key = 'a', channel = 'a/b'
         if (channel.indexOf(key) === 0) {
-          result = 2
-          break
+          // has children, dig into it
+          if (middlewares[key].children) {
+            middlewares = middlewares[key].children!
+            break
+          }
+          // no children, insert as the children
+          middlewares[key].children = { [channel]: { mdlws: [cb] } }
+          return
         }
         // channel contains existing tree
+        //  e.g. key = 'a/b', channel = 'a'
         if (key.indexOf(channel) === 0) {
-          result = 3
-          break
-        }
-      }
-      // not found
-      if (!result) break
-      // exists
-      if (result === 1) {
-        middlewares[key].mdlws.push(cb)
-        return
-      }
-      // channel be included
-      if (result === 2) {
-        // has children, dig into it
-        if (middlewares[key].children) {
-          middlewares = middlewares[key].children!
-          continue
-        }
-        // no children, insert as the children
-        middlewares[key].children = { [channel]: { mdlws: [cb] } }
-        return
-      }
-      // insert node
-      if (result === 3) {
-        const item = middlewares[key]
-        delete middlewares[key]
-        middlewares[channel] = {
-          mdlws: [cb],
-          children: {
-            [key]: item
+          const item = middlewares[key]
+          delete middlewares[key]
+          middlewares[channel] = {
+            mdlws: [cb],
+            children: {
+              [key]: item
+            }
           }
+          return
         }
-        return
       }
+      // not found, add to the end
+      if (len < 0) break
     }
     middlewares[channel] = { mdlws: [cb] }
   }
@@ -252,18 +247,6 @@ export default class Composie<IContext extends IBaseContext> {
   }
 
   /**
-   * create context used by middleware
-   * @param evt message event
-   */
-  // protected createContext (channel: string, data: any) {
-  //   const context = {
-  //     channel: channel,
-  //     request: data
-  //   } as IContext
-  //   return context
-  // }
-
-  /**
    * get all middlewares match the channel
    * @param channel channel name
    */
@@ -275,7 +258,8 @@ export default class Composie<IContext extends IBaseContext> {
       middlewares = middlewares[this.wildcard].children
     }
     while (middlewares) {
-      const k = Object.keys(middlewares).find(k => channel.indexOf(k) !== -1)
+      // find specified middlewares which is the prefix of the channel
+      const k = Object.keys(middlewares).find(k => channel.indexOf(k) === 0)
       if (k === undefined) break
       result.push(...middlewares[k].mdlws)
       middlewares = middlewares[k].children

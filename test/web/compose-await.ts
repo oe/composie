@@ -5,57 +5,32 @@ const getData = () => new Promise((resolve, reject) => {
   setTimeout(() => resolve('data retrieved'), 2000)
 })
 
-async function fallback(ctx, next) {
-  try {
-    await next()
-  } catch (error) {
-    console.error('error caught', error)
-    console.error('ctx', ctx)
-  }
-}
 
-async function one (ctx, next) {
-  console.log('first one, wait for 2s')
-  await getData()
-  ctx.response = (ctx.response || '') +  ' abcdefghijklmnopqrstuvwxyz'
-  return next()
-}
-function two (ctx, next) {
-  console.log('the second')
-  return next()
-}
-function three (ctx, next) {
-  console.log('the third')
-  if (ctx.response) {
-    ctx.response += ' from third middleware /'
-  } else {
-    ctx.response = 'from third middleware'
-  }
-  return next()
-}
 
-harbor.use(fallback).use(one).use(two).use(one).use(three)
+// harbor.use(async function fallback(ctx, next) {
+//   try {
+//     await next()
+//   } catch (error) {
+//     console.error('error caught', error)
+//     console.error('ctx', ctx)
+//   }
+// })
 
-harbor.on('test', async (ctx, next) => {
-  ctx.response.route = 'with route'
-  // throw new Error('test error')
-  await next()
-  await next()
+harbor.use('i/', async function (ctx, next) {
+  console.log('middleware I: received request', ctx.channel)
+  return next()
 })
 
-harbor.on('sync-test', (ctx, next) => {
-  ctx.response = 'with route'
-  throw new Error('test error')
+harbor.use('api/', async function (ctx, next) {
+  console.log('middleware API: received request', ctx.channel)
+  return next()
 })
 
 
-
-harbor.emit('api/user-info').then((response) => {
-  console.log('done', response)
-}, (e) => console.log('failed', e))
-
-harbor.emit('test').catch((error) => {
-  console.log('failed', error)
+harbor.on('api/user', async function (ctx, next) {
+  ctx.response = 'user data ' + Date.now()
 })
 
-harbor.run('sync-test', 'aaa')
+
+harbor.emit('api/user').then(console.log)
+
