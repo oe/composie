@@ -38,10 +38,10 @@ type ICreateContext<C> = (channel: string, data: any) => C
  * create context used by middleware
  * @param evt message event
  */
-function createDefaultContext<T extends IBaseContext> (channel: string, data: any) {
+function createDefaultContext<T extends IBaseContext> (channel: string, request?: any) {
   return {
-    channel: channel,
-    request: data,
+    channel,
+    request,
   } as T
 }
 
@@ -53,6 +53,11 @@ export const COMPOSIE_ERROR_CODES = {
    * route not found
    */
   ROUTE_NOT_FOUND: 'ROUTE_NOT_FOUND',
+
+  /**
+   * route exists, throw when add a alias which has a route with the same name
+   */
+  ROUTE_EXISTS: 'ROUTE_EXISTS',
   /**
    * unknown error
    */
@@ -109,16 +114,31 @@ function getUUID () {
  * Composie, custructor need no arugments
  */
 export default class Composie<IContext extends IBaseContext> {
-  // use an uuid as the root middleware key
+  /**
+   * use an uuid as the root middleware key
+   */
   private wildcard = getUUID()
-  // global middlewares
+  /**
+   * global middlewares
+   */
   private middlewares: IGlobalMiddleware<IContext> = {}
-  // router map
+  /**
+   * router map
+   */
   private routers: IRouters<IContext> = {}
-
+  /**
+   * create context function
+   */
   private createContext: ICreateContext<IContext>
-
+  /**
+   * throw when no route found
+   */
   private throwWhenNoRoute: boolean
+
+  /**
+   * route alias map
+   */
+  private aliasMap: { [k: string]: string } = {}
 
   constructor (options: IComposieOptions<IContext> = createDefaultContext) {
     if (typeof options === 'function') {
@@ -170,13 +190,14 @@ export default class Composie<IContext extends IBaseContext> {
       }
     }
     Object.keys(routers).forEach((k) => {
-      let cbs = routers[k]
+      const channel = this.aliasMap[k] || k
+      let cbs = routers[channel]
       if (!Array.isArray(cbs)) cbs = [cbs]
       if (!cbs.length) return
-      if (!this.routers[k]) {
-        this.routers[k] = []
+      if (!this.routers[channel]) {
+        this.routers[channel] = []
       }
-      this.routers[k].push(...cbs)
+      this.routers[channel].push(...cbs)
     })
     return this
   }
@@ -185,6 +206,52 @@ export default class Composie<IContext extends IBaseContext> {
    * add router, alias of route
    */
   on: Composie<IContext>['route'] = this.route
+
+  /**
+   * add alias for a channel
+   * @param existing existing channel name
+   * @param alias    alias name
+   */
+  alias (existing: string, alias: string) {
+    if (this.routers[alias]) {
+      throw new ComposieError({
+        code: COMPOSIE_ERROR_CODES.ROUTE_EXISTS,
+        message: `route for ${alias} already exists`,
+      })
+    }
+    this.aliasMap[alias] = existing
+    return this
+  }
+
+  /**
+   * remove callback for a channel
+   *  ** Note**: middlewares added by `use()` can't be removed
+   * @param channel channel name
+   * @param cb callback, if not set, remove all callbacks for the channel
+   * @returns true if removed, false if not found
+   */
+  removeRoute(channel: string, cb?: IMiddleware<IContext>) {
+    const cbs = this.routers[this.aliasMap[channel] || channel]
+    if (!cbs || !cbs.length) return false
+    if (!cb) {
+      delete this.routers[channel]
+      return true
+    }
+    const newCbs = cbs.filter(c => c !== cb)
+    if (newCbs.length === cbs.length) return false
+    if (newCbs.length) {
+      this.routers[channel] = newCbs
+    } else {
+      delete this.routers[channel]
+    }
+    return true
+  }
+
+  /**
+   * remove callback for a channel, alias of removeRoute
+   */
+  off: Composie<IContext>['removeRoute'] = this.removeRoute
+
   /**
    * run middlewares
    *
@@ -193,15 +260,15 @@ export default class Composie<IContext extends IBaseContext> {
    */
   run (channel: string, data?: any) {
     const ctx: IContext = this.createContext(channel, data)
-    const method = ctx.channel
+    const method = this.aliasMap[ctx.channel] || ctx.channel
     const routerCbs = this.routers[method] || []
     if (!routerCbs.length) {
       if (this.throwWhenNoRoute) {
-        routerCbs.push((ctx, next) => {
+        routerCbs.push((ctx) => {
           throw new ComposieError({
             code: COMPOSIE_ERROR_CODES.ROUTE_NOT_FOUND,
             message: `route ${method} not found`,
-            data: { channel: method, request: ctx.request }
+            data: { channel: method, request: ctx.request, originalChannel: ctx.channel}
           })
         })
       }
@@ -337,4 +404,3 @@ export default class Composie<IContext extends IBaseContext> {
     return result
   }
 }
-
