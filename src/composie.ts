@@ -46,6 +46,11 @@ function createDefaultContext<T extends IBaseContext> (channel: string, request?
 }
 
 /**
+ * property name which is used to store the wrapped middleware in the route callback
+ */
+const WRAPPED_MIDDLEWARE_NAME = '_middleware_'
+
+/**
  * composie error codes
  */
 export const COMPOSIE_ERROR_CODES = {
@@ -64,28 +69,46 @@ export const COMPOSIE_ERROR_CODES = {
   UNKNOWN: 'UNKNOWN'
 } as const
 
-export interface IComposieErrorOptions {
+
+/**
+ * Composie error object constructor options
+ */
+export interface IComposieErrorOptions<T = unknown> {
+  /**
+   * error code
+   */
   code: string
+  /**
+   * error message
+   */
   message: string
+  /**
+   * original error object
+   */
   originalError?: Error
-  data?: unknown
+  /**
+   * additional data
+   */
+  data?: T
 }
 
 /**
  * Composie error class
  */
-export class ComposieError extends Error {
+export class ComposieError<T = unknown> extends Error {
   code: string
   originalError: Error
-  data?: unknown
-  constructor (options: IComposieErrorOptions) {
+  data?: T
+  constructor (options: IComposieErrorOptions<T>) {
     super(options.message)
     this.code = options.code
     this.originalError = options.originalError || new Error(options.message)
     this.data = options.data
     this.name = 'ComposieError'
   }
-
+  /**
+   * alias of COMPOSIE_ERROR_CODES
+   */
   static CODES = COMPOSIE_ERROR_CODES
 }
 
@@ -95,6 +118,11 @@ export class ComposieError extends Error {
  */
 export type IComposieOptions<IContext> = {
   createContext?: ICreateContext<IContext>
+
+  /**
+   * use normal event callback style, default is false
+   */
+  useEventCallbackStyle?: boolean
   /**
    * throw when no route found, default is false
    */
@@ -136,6 +164,11 @@ export default class Composie<IContext extends IBaseContext> {
   private throwWhenNoRoute: boolean
 
   /**
+   * use event callback style
+   */
+  private useEventCallbackStyle: boolean
+
+  /**
    * route alias map
    */
   private aliasMap: { [k: string]: string } = {}
@@ -144,9 +177,11 @@ export default class Composie<IContext extends IBaseContext> {
     if (typeof options === 'function') {
       this.createContext = options
       this.throwWhenNoRoute = false
+      this.useEventCallbackStyle = false
     } else {
       this.createContext = options.createContext || createDefaultContext
       this.throwWhenNoRoute = options.throwWhenNoRoute || false
+      this.useEventCallbackStyle = options.useEventCallbackStyle || false
     }
   }
 
@@ -197,6 +232,9 @@ export default class Composie<IContext extends IBaseContext> {
       if (!this.routers[channel]) {
         this.routers[channel] = []
       }
+      if (this.useEventCallbackStyle) {
+        cbs = cbs.map(Composie.convert2middleware)
+      }
       this.routers[channel].push(...cbs)
     })
     return this
@@ -213,6 +251,8 @@ export default class Composie<IContext extends IBaseContext> {
    * @param alias    alias name
    */
   alias (existing: string, alias: string) {
+    // same alias, do nothing
+    if (existing === alias) return this
     if (this.routers[alias]) {
       throw new ComposieError({
         code: COMPOSIE_ERROR_CODES.ROUTE_EXISTS,
@@ -230,14 +270,21 @@ export default class Composie<IContext extends IBaseContext> {
    * @param cb callback, if not set, remove all callbacks for the channel
    * @returns true if removed, false if not found
    */
-  removeRoute(channel: string, cb?: IMiddleware<IContext>) {
-    const cbs = this.routers[this.aliasMap[channel] || channel]
+  removeRoute(channel: string, cb?: IMiddleware<IContext> | Function) {
+    // remove alias if exists
+    if (this.aliasMap[channel]) {
+      delete this.aliasMap[channel]
+      return true
+    }
+    const cbs = this.routers[channel]
     if (!cbs || !cbs.length) return false
     if (!cb) {
       delete this.routers[channel]
       return true
     }
-    const newCbs = cbs.filter(c => c !== cb)
+    // @ts-ignore
+    const middleware = cb[WRAPPED_MIDDLEWARE_NAME] || cb
+    const newCbs = cbs.filter(c => c !== middleware)
     if (newCbs.length === cbs.length) return false
     if (newCbs.length) {
       this.routers[channel] = newCbs
@@ -289,6 +336,27 @@ export default class Composie<IContext extends IBaseContext> {
    * run middlewares, alias of run
    */
   emit: Composie<IContext>['run'] = this.run
+
+  /**
+   * convert a normal callback to a route handler
+   * @param fn normal callback
+   *  fn: (request: any) => response
+   * fn receives a request object and returns a response object(can be a promise) or undefined
+   *    if response is undefined, then it will be ignored
+   */
+  static convert2middleware (fn: Function): IMiddleware<IBaseContext> {
+    const middleware = async function (ctx: IBaseContext, next: Function) {
+      const response = await fn(ctx.request)
+      if (response !== undefined) {
+        ctx.response = response
+      }
+      return next()
+    }
+    // @ts-ignore
+    fn[WRAPPED_MIDDLEWARE_NAME] = middleware
+
+    return middleware
+  }
 
   /**
    * add a prefix for a channel

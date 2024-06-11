@@ -253,7 +253,7 @@ compose
     // ...
     return next();
   })
-  .use('api', function(ctx, next) {
+  .use('api', function(ctx, nexdt) {
     // your logic here
     // ...
     return next();
@@ -295,6 +295,9 @@ composie.removeRoute('api/user');
 compose.off('api/user', middleware);
 ```
 
+When you remove a alias, the alias will be removed, but the existing channel will be kept.
+
+
 ### composie.run(channel, request?)
 
 run middleware for `channel`, it will return a promise
@@ -333,6 +336,8 @@ compose
     }
   );
 ```
+
+## Use Composite as a Event Bus
 
 
 ## Advanced Example
