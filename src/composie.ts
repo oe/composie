@@ -48,7 +48,22 @@ function createDefaultContext<T extends IBaseContext> (channel: string, request?
 /**
  * property name which is used to store the wrapped middleware in the route callback
  */
-const WRAPPED_MIDDLEWARE_NAME = '_middleware_'
+const WRAPPED_MIDDLEWARE_NAME = getUUID()
+
+/**
+ * standardize converter
+ *  add WRAPPED_MIDDLEWARE_NAME property to original callback
+ *  for a convenient way to removeRoute(off) a route
+ * @param converter normal converter
+ * @returns standardized convert
+ */
+function createMiddlewareConverter<T extends IBaseContext>(converter: (fn: Function) => IMiddleware<T>) {
+  return (fn: Function) => {
+    const middleware = converter(fn)
+    fn[WRAPPED_MIDDLEWARE_NAME] = middleware
+    return middleware
+  }
+}
 
 /**
  * composie error codes
@@ -122,7 +137,7 @@ export type IComposieOptions<IContext> = {
   /**
    * use normal event callback style, default is false
    */
-  useEventCallbackStyle?: boolean
+  useEventCallbackStyle?: boolean | ((fn: Function) => IMiddleware<IContext>)
   /**
    * throw when no route found, default is false
    */
@@ -169,6 +184,11 @@ export default class Composie<IContext extends IBaseContext> {
   private useEventCallbackStyle: boolean
 
   /**
+   * convert a normal callback to a route handler, only used when useEventCallbackStyle is true
+   */
+  private fn2middleware?: (fn: Function) => IMiddleware<IContext>
+
+  /**
    * route alias map
    */
   private aliasMap: { [k: string]: string } = {}
@@ -181,7 +201,10 @@ export default class Composie<IContext extends IBaseContext> {
     } else {
       this.createContext = options.createContext || createDefaultContext
       this.throwWhenNoRoute = options.throwWhenNoRoute || false
-      this.useEventCallbackStyle = options.useEventCallbackStyle || false
+      this.useEventCallbackStyle = !!options.useEventCallbackStyle || false
+      if (this.useEventCallbackStyle) {
+        this.fn2middleware = typeof options.useEventCallbackStyle === 'function' ? createMiddlewareConverter(options.useEventCallbackStyle) : Composie.convert2middleware
+      }
     }
   }
 
@@ -233,7 +256,7 @@ export default class Composie<IContext extends IBaseContext> {
         this.routers[channel] = []
       }
       if (this.useEventCallbackStyle) {
-        cbs = cbs.map(Composie.convert2middleware)
+        cbs = cbs.map(this.fn2middleware!)
       }
       this.routers[channel].push(...cbs)
     })
@@ -282,9 +305,15 @@ export default class Composie<IContext extends IBaseContext> {
       delete this.routers[channel]
       return true
     }
-    // @ts-ignore
     const middleware = cb[WRAPPED_MIDDLEWARE_NAME] || cb
-    const newCbs = cbs.filter(c => c !== middleware)
+    const newCbs = cbs.filter(c => {
+      if (c === middleware) {
+        // clear wrapped middleware
+        delete cb[WRAPPED_MIDDLEWARE_NAME]
+        return false
+      }
+      return true
+    })
     if (newCbs.length === cbs.length) return false
     if (newCbs.length) {
       this.routers[channel] = newCbs
@@ -344,19 +373,15 @@ export default class Composie<IContext extends IBaseContext> {
    * fn receives a request object and returns a response object(can be a promise) or undefined
    *    if response is undefined, then it will be ignored
    */
-  static convert2middleware (fn: Function): IMiddleware<IBaseContext> {
-    const middleware = async function (ctx: IBaseContext, next: Function) {
+  static convert2middleware = createMiddlewareConverter((fn: Function) => {
+    return async function (ctx: IBaseContext, next: Function) {
       const response = await fn(ctx.request)
       if (response !== undefined) {
         ctx.response = response
       }
       return next()
     }
-    // @ts-ignore
-    fn[WRAPPED_MIDDLEWARE_NAME] = middleware
-
-    return middleware
-  }
+  })
 
   /**
    * add a prefix for a channel
