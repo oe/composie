@@ -74,13 +74,13 @@ describe('useEventCallbackStyle', () => {
       return middleware
     })
 
-      // @ts-ignore
-      composie.on('demo', (message) => ({response: message, cancel: message === 'message'}))
-      composie.on('demo', (message) => ({response: 'next'}))
-      const res = await composie.emit('demo', 'message')
-      expect(res).toBe('message')
-      const res2 = await composie.emit('demo', 'message2')
-      expect(res2).toBe('next')
+    // @ts-ignore
+    composie.on('demo', (message) => ({response: message, cancel: message === 'message'}))
+    composie.on('demo', (message) => ({response: 'next'}))
+    const res = await composie.emit('demo', 'message')
+    expect(res).toBe('message')
+    const res2 = await composie.emit('demo', 'message2')
+    expect(res2).toBe('next')
   })
 
 })

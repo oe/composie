@@ -1,5 +1,10 @@
 /** middleware */
 export interface IMiddleware<C> {
+  /**
+   * middleware function
+   * @param ctx context object with channel, request, response property
+   * @param next function to call next middleware
+   */
   (ctx: C, next: Function): any
 }
 
@@ -16,8 +21,8 @@ export interface IRouters<C> {
 }
 
 /** param for route */
-export interface IRouteParam<C> {
-  [k: string]: IMiddleware<C>[] | IMiddleware<C>
+export interface IRouteParam<F> {
+  [k: string]: F[] | F
 }
 
 /** request context for middleware */
@@ -32,7 +37,6 @@ export interface IBaseContext {
   [k: number]: any
 }
 
-type ICreateContext<C> = (channel: string, data: any) => C
 
 /**
  * create context used by middleware
@@ -128,21 +132,54 @@ export class ComposieError<T = unknown> extends Error {
 }
 
 
-/**
- * Composie options
- */
-export type IComposieOptions<IContext> = {
+export type ICreateContext<C> = (channel: string, data: any) => C
+
+export interface IComposieOptionsInner<IContext>  {
   createContext?: ICreateContext<IContext>
 
   /**
    * use normal event callback style, default is false
    */
-  useEventCallbackStyle?: boolean | ((fn: Function) => IMiddleware<IContext>)
+  useEventCallbackStyle?: IEventStyle<IContext>
   /**
    * throw when no route found, default is false
    */
   throwWhenNoRoute?: boolean
-} | ICreateContext<IContext>
+}
+
+/**
+ * Composie options
+ */
+export type IComposieOptions<IContext> = IComposieOptionsInner<IContext> | ICreateContext<IContext>
+
+/**
+ * event style
+ */
+export type IEventStyle<C> = true | false | ((fn: Function) => IMiddleware<C>) | undefined
+
+type IIsUsingEventStyle<C, S> =
+  S extends undefined ? false
+  : (S extends Function ? false
+  : (S extends IComposieOptionsInner<any>
+    ? (S['useEventCallbackStyle'] extends true ? true
+      : S['useEventCallbackStyle'] extends undefined ? false
+      : S['useEventCallbackStyle'] extends false ? false
+      : S['useEventCallbackStyle'] extends Function ? true : false)
+    : false))
+
+type IA = IIsUsingEventStyle<IBaseContext, {useEventCallbackStyle: (fn: Function) => IMiddleware<IBaseContext>}>
+type IAXC = IIsUsingEventStyle<IBaseContext, undefined>
+
+
+type IRouterCallback<IContext extends IBaseContext> =
+  IIsUsingEventStyle<IContext, IComposieOptions<IContext>> extends false
+  ? IMiddleware<IContext>
+  // : S extends Function
+  //   ? ((arg: any) => any)
+    : ((arg: IContext['request']) => any)
+
+
+// type ICC = IRouterCallback<IBaseContext, false>
 
 /**
  * generate a uuid, if crypto.randomUUID exists, use it, otherwise generate a random string
@@ -154,9 +191,13 @@ function getUUID () {
 }
 
 /**
- * Composie, custructor need no arugments
+ * Composie
  */
-export default class Composie<IContext extends IBaseContext> {
+export default class Composie<
+  IContext extends IBaseContext,
+  IRouterFn = IRouterCallback<IContext>
+  > {
+
   /**
    * use an uuid as the root middleware key
    */
@@ -234,14 +275,14 @@ export default class Composie<IContext extends IBaseContext> {
    * add router
    * @param routers router map
    */
-  route (routers: IRouteParam<IContext>)
+  route (routers: IRouteParam<IRouterFn>)
   /**
    * add router
    * @param channel channel name
    * @param cbs channel handlers
    */
-  route (channel: string, ...cbs: IMiddleware<IContext>[])
-  route (routers: IRouteParam<IContext> | string, ...cbs: IMiddleware<IContext>[]) {
+  route (channel: string, ...cbs: IRouterFn[])
+  route (routers: IRouteParam<IRouterFn> | string, ...cbs: IRouterFn[]) {
     if (typeof routers === 'string') {
       routers = {
         [routers]: cbs
@@ -256,8 +297,10 @@ export default class Composie<IContext extends IBaseContext> {
         this.routers[channel] = []
       }
       if (this.useEventCallbackStyle) {
+        // @ts-ignore
         cbs = cbs.map(this.fn2middleware!)
       }
+      // @ts-ignore
       this.routers[channel].push(...cbs)
     })
     return this
@@ -266,7 +309,7 @@ export default class Composie<IContext extends IBaseContext> {
   /**
    * add router, alias of route
    */
-  on: Composie<IContext>['route'] = this.route
+  on: Composie<IContext, IRouterFn>['route'] = this.route
 
   /**
    * add alias for a channel
@@ -293,7 +336,7 @@ export default class Composie<IContext extends IBaseContext> {
    * @param cb callback, if not set, remove all callbacks for the channel
    * @returns true if removed, false if not found
    */
-  removeRoute(channel: string, cb?: IMiddleware<IContext> | Function) {
+  removeRoute(channel: string, cb?: IRouterFn) {
     // remove alias if exists
     if (this.aliasMap[channel]) {
       delete this.aliasMap[channel]
@@ -326,7 +369,7 @@ export default class Composie<IContext extends IBaseContext> {
   /**
    * remove callback for a channel, alias of removeRoute
    */
-  off: Composie<IContext>['removeRoute'] = this.removeRoute
+  off: Composie<IContext, IRouterFn>['removeRoute'] = this.removeRoute
 
   /**
    * run middlewares
@@ -364,7 +407,7 @@ export default class Composie<IContext extends IBaseContext> {
   /**
    * run middlewares, alias of run
    */
-  emit: Composie<IContext>['run'] = this.run
+  emit: Composie<IContext, IRouterFn>['run'] = this.run
 
   /**
    * convert a normal callback to a route handler
