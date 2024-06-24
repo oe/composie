@@ -131,52 +131,61 @@ export class ComposieError<T = unknown> extends Error {
   static CODES = COMPOSIE_ERROR_CODES
 }
 
+/**
+ * create context function
+ */
+export type ICreateContext<C extends IBaseContext> = (channel: string, data: any) => C
 
-export type ICreateContext<C> = (channel: string, data: any) => C
-
-export interface IComposieOptionsInner<IContext>  {
-  createContext?: ICreateContext<IContext>
-
+/**
+ * Composie options for normal route style
+ */
+export type INormalComposeOptions<C extends IBaseContext> = {
   /**
-   * use normal event callback style, default is false
+   * create context function
    */
-  useEventCallbackStyle?: IEventStyle<IContext>
+  createContext?: ICreateContext<C>
   /**
-   * throw when no route found, default is false
+   * throw when no route found
    */
   throwWhenNoRoute?: boolean
+  /**
+   * use normal route style
+   */
+  useEventCallbackStyle?: false
+} | ICreateContext<C>
+
+
+/**
+ * Composie options for event callback style
+ */
+export type IEventComposeOptions<C extends IBaseContext> = {
+  /**
+   * create context function
+   */
+  createContext?: ICreateContext<C>
+  /**
+   * throw when no route found
+   */
+  throwWhenNoRoute: boolean
+  /**
+   * use event callback style
+   */
+  useEventCallbackStyle: true | ((fn: Function) => IMiddleware<C>)
 }
 
 /**
  * Composie options
  */
-export type IComposieOptions<IContext> = IComposieOptionsInner<IContext> | ICreateContext<IContext>
+export type IComposieOptions<IContext extends IBaseContext> = IEventComposeOptions<IContext> | INormalComposeOptions<IContext>
+
 
 /**
- * event style
+ * Router callback(used by route(on) method)
  */
-export type IEventStyle<C> = true | false | ((fn: Function) => IMiddleware<C>) | undefined
-
-type IIsUsingEventStyle<C, S> =
-  S extends undefined ? false
-  : (S extends Function ? false
-  : (S extends IComposieOptionsInner<any>
-    ? (S['useEventCallbackStyle'] extends true ? true
-      : S['useEventCallbackStyle'] extends undefined ? false
-      : S['useEventCallbackStyle'] extends false ? false
-      : S['useEventCallbackStyle'] extends Function ? true : false)
-    : false))
-
-type IA = IIsUsingEventStyle<IBaseContext, {useEventCallbackStyle: (fn: Function) => IMiddleware<IBaseContext>}>
-type IAXC = IIsUsingEventStyle<IBaseContext, undefined>
-
-
-type IRouterCallback<IContext extends IBaseContext> =
-  IIsUsingEventStyle<IContext, IComposieOptions<IContext>> extends false
-  ? IMiddleware<IContext>
-  // : S extends Function
-  //   ? ((arg: any) => any)
-    : ((arg: IContext['request']) => any)
+type IRouterCallback<IContext extends IBaseContext, Params> =
+  Params extends IEventComposeOptions<IContext>
+    ? ((arg: IContext['request']) => any)
+    : IMiddleware<IContext>
 
 
 // type ICC = IRouterCallback<IBaseContext, false>
@@ -195,7 +204,8 @@ function getUUID () {
  */
 export default class Composie<
   IContext extends IBaseContext,
-  IRouterFn = IRouterCallback<IContext>
+  IOptions = IComposieOptions<IContext>,
+  IRouterFn = IRouterCallback<IContext, IOptions>
   > {
 
   /**
@@ -256,7 +266,7 @@ export default class Composie<
   use (cb: IMiddleware<IContext>)
   use (prefix: string, cb: IMiddleware<IContext>)
   /**
-   * add global middleware foucs on specifc channel prefix
+   * add global middleware focus on specific channel prefix
    * @param prefix channel prefix
    * @param cb     middleware
    */
@@ -309,7 +319,7 @@ export default class Composie<
   /**
    * add router, alias of route
    */
-  on: Composie<IContext, IRouterFn>['route'] = this.route
+  on: Composie<IContext, IOptions, IRouterFn>['route'] = this.route
 
   /**
    * add alias for a channel
@@ -369,7 +379,7 @@ export default class Composie<
   /**
    * remove callback for a channel, alias of removeRoute
    */
-  off: Composie<IContext, IRouterFn>['removeRoute'] = this.removeRoute
+  off: Composie<IContext, IOptions, IRouterFn>['removeRoute'] = this.removeRoute
 
   /**
    * run middlewares
