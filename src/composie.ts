@@ -134,12 +134,12 @@ export class ComposieError<T = unknown> extends Error {
 /**
  * create context function
  */
-export type ICreateContext<C extends IBaseContext> = (channel: string, data: any) => C
+export type ICreateContext<C extends IBaseContext> = (channel: string, request: any) => C
 
 /**
  * Composie options for normal route style
  */
-export type INormalComposeOptions<C extends IBaseContext> = {
+export interface INormalComposeOptions<C extends IBaseContext> {
   /**
    * create context function
    */
@@ -148,47 +148,14 @@ export type INormalComposeOptions<C extends IBaseContext> = {
    * throw when no route found
    */
   throwWhenNoRoute?: boolean
-  /**
-   * use normal route style
-   */
-  useEventCallbackStyle?: false
-} | ICreateContext<C>
-
-
-/**
- * Composie options for event callback style
- */
-export type IEventComposeOptions<C extends IBaseContext> = {
-  /**
-   * create context function
-   */
-  createContext?: ICreateContext<C>
-  /**
-   * throw when no route found
-   */
-  throwWhenNoRoute: boolean
-  /**
-   * use event callback style
-   */
-  useEventCallbackStyle: true | ((fn: Function) => IMiddleware<C>)
 }
+
 
 /**
  * Composie options
  */
-export type IComposieOptions<IContext extends IBaseContext> = IEventComposeOptions<IContext> | INormalComposeOptions<IContext>
+export type IComposieOptions<C extends IBaseContext> = INormalComposeOptions<C> | ICreateContext<C>
 
-
-/**
- * Router callback(used by route(on) method)
- */
-type IRouterCallback<IContext extends IBaseContext, Params> =
-  Params extends IEventComposeOptions<IContext>
-    ? ((arg: IContext['request']) => any)
-    : IMiddleware<IContext>
-
-
-// type ICC = IRouterCallback<IBaseContext, false>
 
 /**
  * generate a uuid, if crypto.randomUUID exists, use it, otherwise generate a random string
@@ -204,8 +171,7 @@ function getUUID () {
  */
 export default class Composie<
   IContext extends IBaseContext,
-  IOptions = IComposieOptions<IContext>,
-  IRouterFn = IRouterCallback<IContext, IOptions>
+  IRouterFn = IMiddleware<IContext>
   > {
 
   /**
@@ -228,14 +194,8 @@ export default class Composie<
    * throw when no route found
    */
   private throwWhenNoRoute: boolean
-
   /**
-   * use event callback style
-   */
-  private useEventCallbackStyle: boolean
-
-  /**
-   * convert a normal callback to a route handler, only used when useEventCallbackStyle is true
+   * convert a normal callback to a route handler
    */
   private fn2middleware?: (fn: Function) => IMiddleware<IContext>
 
@@ -248,13 +208,13 @@ export default class Composie<
     if (typeof options === 'function') {
       this.createContext = options
       this.throwWhenNoRoute = false
-      this.useEventCallbackStyle = false
     } else {
       this.createContext = options.createContext || createDefaultContext
       this.throwWhenNoRoute = options.throwWhenNoRoute || false
-      this.useEventCallbackStyle = !!options.useEventCallbackStyle || false
-      if (this.useEventCallbackStyle) {
-        this.fn2middleware = typeof options.useEventCallbackStyle === 'function' ? createMiddlewareConverter(options.useEventCallbackStyle) : Composie.convert2middleware
+      // @ts-expect-error inner process only
+      if (typeof options.convertCallback2Middleware === 'function') {
+        // @ts-expect-error inner process only
+        this.fn2middleware = options.convertCallback2Middleware
       }
     }
   }
@@ -306,9 +266,9 @@ export default class Composie<
       if (!this.routers[channel]) {
         this.routers[channel] = []
       }
-      if (this.useEventCallbackStyle) {
+      if (this.fn2middleware) {
         // @ts-ignore
-        cbs = cbs.map(this.fn2middleware!)
+        cbs = cbs.map(this.fn2middleware)
       }
       // @ts-ignore
       this.routers[channel].push(...cbs)
@@ -319,7 +279,7 @@ export default class Composie<
   /**
    * add router, alias of route
    */
-  on: Composie<IContext, IOptions, IRouterFn>['route'] = this.route
+  on: Composie<IContext, IRouterFn>['route'] = this.route
 
   /**
    * add alias for a channel
@@ -379,7 +339,7 @@ export default class Composie<
   /**
    * remove callback for a channel, alias of removeRoute
    */
-  off: Composie<IContext, IOptions, IRouterFn>['removeRoute'] = this.removeRoute
+  off: Composie<IContext, IRouterFn>['removeRoute'] = this.removeRoute
 
   /**
    * run middlewares
@@ -418,23 +378,11 @@ export default class Composie<
    * run middlewares, alias of run
    */
   emit: Composie<IContext, IRouterFn>['run'] = this.run
-
   /**
-   * convert a normal callback to a route handler
-   * @param fn normal callback
-   *  fn: (request: any) => response
-   * fn receives a request object and returns a response object(can be a promise) or undefined
-   *    if response is undefined, then it will be ignored
+   * run middlewares, alias of run
    */
-  static convert2middleware = createMiddlewareConverter((fn: Function) => {
-    return async function (ctx: IBaseContext, next: Function) {
-      const response = await fn(ctx.request)
-      if (response !== undefined) {
-        ctx.response = response
-      }
-      return next()
-    }
-  })
+  call: Composie<IContext, IRouterFn>['run'] = this.run
+
 
   /**
    * add a prefix for a channel
@@ -549,4 +497,46 @@ export default class Composie<
     }
     return result
   }
+}
+
+
+/**
+ * convert a normal callback to a route handler
+ * @param fn normal callback
+ *  fn: (request: any) => response
+ * fn receives a request object and returns a response object(can be a promise) or undefined
+ *    if response is undefined, then it will be ignored
+ */
+const convert2middleware = createMiddlewareConverter((fn: Function) => {
+  return async function (ctx: IBaseContext, next: Function) {
+    const response = await fn(ctx.request)
+    if (typeof response !== 'undefined') {
+      ctx.response = response
+    }
+    return next()
+  }
+})
+
+
+export interface IEventBusOptions<C extends IBaseContext> extends INormalComposeOptions<C> {
+  /**
+   * convert a normal callback to a route handler
+   */
+  convertCallback2Middleware?: ((fn: Function) => IMiddleware<C>)
+}
+
+
+export type IEventCallback = (params: any) => any
+
+/**
+ * create a event bus
+ */
+export function createEventBus<
+  C extends IBaseContext,
+  IFn extends ((params: any) => any) = ((params: C['request']) => any)
+> (options: IEventBusOptions<C> = { createContext: createDefaultContext, convertCallback2Middleware: convert2middleware }) {
+  const newOptions = Object.assign({}, options)
+  newOptions.createContext = options.createContext || createDefaultContext
+  newOptions.convertCallback2Middleware = options.convertCallback2Middleware || convert2middleware
+  return new Composie<C, IFn>(newOptions)
 }

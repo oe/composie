@@ -302,7 +302,7 @@ When you remove a alias, the alias will be removed, but the existing channel wil
 
 run middleware for `channel`, it will return a promise
 
-`composie.emit` is an alias of `composie.run`, use it as you like.
+`composie.emit` and `composie.call` are aliases of `composie.run`, use it as you like.
 
 ```js
 compose.run("api/user", { id: "xxx" }).then(
@@ -314,30 +314,61 @@ compose.run("api/user", { id: "xxx" }).then(
   }
 );
 ```
+### createEventBus(options)
+create a new instance of `Composie` as an event bus, using  normal event callback as route middleware
 
-### composie.run(context)
+```ts
+import { createEventBus } from 'composie';
 
-run middleware with custom `context`, a valid context must contain a string `channel` and an optional `request`.
+const eventBus = createEventBus(...)
 
-`composie.emit` is an alias of `composie.run`, use it as you like.
-
-```js
-compose
-  .run({
-    channel: "api/user",
-    request: { id: "xxx" }
-  })
-  .then(
-    resp => {
-      console.log("response ", resp);
-    },
-    err => {
-      console.log("error", err);
-    }
-  );
+interface IEventBusOptions<IContext extends IBaseContext> {
+  /**
+   * convert a normal callback to a route handler
+   */
+  convertCallback2Middleware?: (fn: Function) => ((ctx: IContext, next: Function): any)
+  /**
+   * create context function
+   */
+  createContext?: (channel: string, request: any) => IContext
+  /**
+   * throw when no route found
+   */
+  throwWhenNoRoute?: boolean
+}
 ```
 
+for detail usage check the example below
+
+
 ## Use Composite as a Event Bus
+
+```ts
+import { createEventBus } from 'composie';
+const eventBus = createEventBus({
+  // this is default the default converter
+  convertCallback2Middleware: (fn) => {
+    return async (ctx, next) => {
+      try {
+        const response = await fn(ctx.request);
+        if (typeof response !== 'undefined') {
+          ctx.response = response
+        }
+        return next();
+      } catch (err) {
+        throw err;
+      }
+    }
+  }
+});
+
+eventBus.use(...)
+eventBus.on('userChanged', (userInfo) => {
+  console.log(userInfo)
+})
+eventBus.emit('userChanged', { name: 'xxx', email: 'xxxx'})
+```
+
 
 
 ## Advanced Example

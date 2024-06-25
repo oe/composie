@@ -127,7 +127,7 @@ describe('multi route', () => {
 
   it('should run multi route with array', async () => {
     const composie = new Composie()
-    composie.route({
+    composie.on({
       'test': [(ctx, next) => {
         ctx.response = 'test'
         return next()

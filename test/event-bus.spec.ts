@@ -1,10 +1,10 @@
-import Composie, { ComposieError, COMPOSIE_ERROR_CODES } from '../src/composie';
+import { createEventBus, ComposieError, COMPOSIE_ERROR_CODES } from '../src/composie';
 
 describe('useEventCallbackStyle', () => {
   const createComposie = (throwWhenNoRoute?: boolean, customConverter?: Function) => {
-    const composie = new Composie({
+    const composie = createEventBus({
       // @ts-ignore
-      useEventCallbackStyle: customConverter || true,
+      convertCallback2Middleware: customConverter,
       throwWhenNoRoute,
     })
     return composie
@@ -12,7 +12,7 @@ describe('useEventCallbackStyle', () => {
 
   it('should run simple route', async () => {
     const composie = createComposie()
-    composie.on('test', (params) => {
+    composie.route('test', (params) => {
       return params + '-with route'
     })
     const response = await composie.emit('test', 'test')
@@ -54,7 +54,16 @@ describe('useEventCallbackStyle', () => {
   it('using a custom converter', async () => {
     const composie = createComposie(true, (fn) => fn)
 
-    composie.on('demo', (message) => message.response = message.request)
+    composie.on('demo', (ctx) => ctx.response = ctx.request)
+    const response = await composie.emit('demo', 'message')
+
+    expect(response).toBe('message')
+  })
+
+  it('using default params', async () => {
+    const composie = createEventBus()
+
+    composie.on('demo', (message) => message)
     const response = await composie.emit('demo', 'message')
 
     expect(response).toBe('message')
