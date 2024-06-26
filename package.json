@@ -1,6 +1,6 @@
 {
   "name": "composie",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "description": "Compose middleware with router and run it like a charm. Also serves as an advanced event bus with on, off, and emit methods.",
   "main": "dist/composie.umd.js",
   "module": "dist/composie.es.js",
