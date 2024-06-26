@@ -471,5 +471,5 @@ If you find a bug or have a feature request, please submit an issue detailing th
 
 ## Submitting Pull Requests
 1. Fork the repository
-2. Create a new branch (git checkout -b feature-branch)
-3. Commit your changes (`git commit -am '
+2. Create a new branch (`git checkout -b feature-branch`)
+3. Commit your changes (`git commit -am 'message'`)
