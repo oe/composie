@@ -315,7 +315,7 @@ compose.run("api/user", { id: "xxx" }).then(
 );
 ```
 ### createEventBus(options)
-create a new instance of `Composie` as an event bus, using  normal event callback as route middleware
+Utilize Composie as an Event Bus for efficient event handling in your applications.
 
 ```ts
 import { createEventBus } from 'composie';
