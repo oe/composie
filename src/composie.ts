@@ -1,5 +1,10 @@
 /** middleware */
 export interface IMiddleware<C> {
+  /**
+   * middleware function
+   * @param ctx context object with channel, request, response property
+   * @param next function to call next middleware
+   */
   (ctx: C, next: Function): any
 }
 
@@ -16,8 +21,8 @@ export interface IRouters<C> {
 }
 
 /** param for route */
-export interface IRouteParam<C> {
-  [k: string]: IMiddleware<C>[] | IMiddleware<C>
+export interface IRouteParam<F> {
+  [k: string]: F[] | F
 }
 
 /** request context for middleware */
@@ -32,17 +37,36 @@ export interface IBaseContext {
   [k: number]: any
 }
 
-type ICreateContext<C> = (channel: string, data: any) => C
 
 /**
  * create context used by middleware
  * @param evt message event
  */
-function createDefaultContext<T extends IBaseContext> (channel: string, data: any) {
+function createDefaultContext<T extends IBaseContext> (channel: string, request?: any) {
   return {
-    channel: channel,
-    request: data,
+    channel,
+    request,
   } as T
+}
+
+/**
+ * property name which is used to store the wrapped middleware in the route callback
+ */
+const WRAPPED_MIDDLEWARE_NAME = getUUID()
+
+/**
+ * standardize converter
+ *  add WRAPPED_MIDDLEWARE_NAME property to original callback
+ *  for a convenient way to removeRoute(off) a route
+ * @param converter normal converter
+ * @returns standardized convert
+ */
+function createMiddlewareConverter<T extends IBaseContext>(converter: (fn: Function) => IMiddleware<T>) {
+  return (fn: Function) => {
+    const middleware = converter(fn)
+    fn[WRAPPED_MIDDLEWARE_NAME] = middleware
+    return middleware
+  }
 }
 
 /**
@@ -53,48 +77,85 @@ export const COMPOSIE_ERROR_CODES = {
    * route not found
    */
   ROUTE_NOT_FOUND: 'ROUTE_NOT_FOUND',
+
+  /**
+   * route exists, throw when add a alias which has a route with the same name
+   */
+  ROUTE_EXISTS: 'ROUTE_EXISTS',
   /**
    * unknown error
    */
   UNKNOWN: 'UNKNOWN'
 } as const
 
-export interface IComposieErrorOptions {
+
+/**
+ * Composie error object constructor options
+ */
+export interface IComposieErrorOptions<T = unknown> {
+  /**
+   * error code
+   */
   code: string
+  /**
+   * error message
+   */
   message: string
+  /**
+   * original error object
+   */
   originalError?: Error
-  data?: unknown
+  /**
+   * additional data
+   */
+  data?: T
 }
 
 /**
  * Composie error class
  */
-export class ComposieError extends Error {
+export class ComposieError<T = unknown> extends Error {
   code: string
   originalError: Error
-  data?: unknown
-  constructor (options: IComposieErrorOptions) {
+  data?: T
+  constructor (options: IComposieErrorOptions<T>) {
     super(options.message)
     this.code = options.code
     this.originalError = options.originalError || new Error(options.message)
     this.data = options.data
     this.name = 'ComposieError'
   }
-
+  /**
+   * alias of COMPOSIE_ERROR_CODES
+   */
   static CODES = COMPOSIE_ERROR_CODES
+}
+
+/**
+ * create context function
+ */
+export type ICreateContext<C extends IBaseContext> = (channel: string, request: any) => C
+
+/**
+ * Composie options for normal route style
+ */
+export interface INormalComposeOptions<C extends IBaseContext> {
+  /**
+   * create context function
+   */
+  createContext?: ICreateContext<C>
+  /**
+   * throw when no route found
+   */
+  throwWhenNoRoute?: boolean
 }
 
 
 /**
  * Composie options
  */
-export type IComposieOptions<IContext> = {
-  createContext?: ICreateContext<IContext>
-  /**
-   * throw when no route found, default is false
-   */
-  throwWhenNoRoute?: boolean
-} | ICreateContext<IContext>
+export type IComposieOptions<C extends IBaseContext> = INormalComposeOptions<C> | ICreateContext<C>
+
 
 /**
  * generate a uuid, if crypto.randomUUID exists, use it, otherwise generate a random string
@@ -106,19 +167,42 @@ function getUUID () {
 }
 
 /**
- * Composie, custructor need no arugments
+ * Composie
  */
-export default class Composie<IContext extends IBaseContext> {
-  // use an uuid as the root middleware key
+export default class Composie<
+  IContext extends IBaseContext,
+  IRouterFn = IMiddleware<IContext>
+  > {
+
+  /**
+   * use an uuid as the root middleware key
+   */
   private wildcard = getUUID()
-  // global middlewares
+  /**
+   * global middlewares
+   */
   private middlewares: IGlobalMiddleware<IContext> = {}
-  // router map
+  /**
+   * router map
+   */
   private routers: IRouters<IContext> = {}
-
+  /**
+   * create context function
+   */
   private createContext: ICreateContext<IContext>
-
+  /**
+   * throw when no route found
+   */
   private throwWhenNoRoute: boolean
+  /**
+   * convert a normal callback to a route handler
+   */
+  private fn2middleware?: (fn: Function) => IMiddleware<IContext>
+
+  /**
+   * route alias map
+   */
+  private aliasMap: { [k: string]: string } = {}
 
   constructor (options: IComposieOptions<IContext> = createDefaultContext) {
     if (typeof options === 'function') {
@@ -127,6 +211,11 @@ export default class Composie<IContext extends IBaseContext> {
     } else {
       this.createContext = options.createContext || createDefaultContext
       this.throwWhenNoRoute = options.throwWhenNoRoute || false
+      // @ts-expect-error inner process only
+      if (typeof options.convertCallback2Middleware === 'function') {
+        // @ts-expect-error inner process only
+        this.fn2middleware = options.convertCallback2Middleware
+      }
     }
   }
 
@@ -137,7 +226,7 @@ export default class Composie<IContext extends IBaseContext> {
   use (cb: IMiddleware<IContext>)
   use (prefix: string, cb: IMiddleware<IContext>)
   /**
-   * add global middleware foucs on specifc channel prefix
+   * add global middleware focus on specific channel prefix
    * @param prefix channel prefix
    * @param cb     middleware
    */
@@ -156,27 +245,33 @@ export default class Composie<IContext extends IBaseContext> {
    * add router
    * @param routers router map
    */
-  route (routers: IRouteParam<IContext>)
+  route (routers: IRouteParam<IRouterFn>)
   /**
    * add router
    * @param channel channel name
    * @param cbs channel handlers
    */
-  route (channel: string, ...cbs: IMiddleware<IContext>[])
-  route (routers: IRouteParam<IContext> | string, ...cbs: IMiddleware<IContext>[]) {
+  route (channel: string, ...cbs: IRouterFn[])
+  route (routers: IRouteParam<IRouterFn> | string, ...cbs: IRouterFn[]) {
     if (typeof routers === 'string') {
       routers = {
         [routers]: cbs
       }
     }
     Object.keys(routers).forEach((k) => {
-      let cbs = routers[k]
+      const channel = this.aliasMap[k] || k
+      let cbs = routers[channel]
       if (!Array.isArray(cbs)) cbs = [cbs]
       if (!cbs.length) return
-      if (!this.routers[k]) {
-        this.routers[k] = []
+      if (!this.routers[channel]) {
+        this.routers[channel] = []
       }
-      this.routers[k].push(...cbs)
+      if (this.fn2middleware) {
+        // @ts-ignore
+        cbs = cbs.map(this.fn2middleware)
+      }
+      // @ts-ignore
+      this.routers[channel].push(...cbs)
     })
     return this
   }
@@ -184,7 +279,68 @@ export default class Composie<IContext extends IBaseContext> {
   /**
    * add router, alias of route
    */
-  on: Composie<IContext>['route'] = this.route
+  on: Composie<IContext, IRouterFn>['route'] = this.route
+
+  /**
+   * add alias for a channel
+   * @param existing existing channel name
+   * @param alias    alias name
+   */
+  alias (existing: string, alias: string) {
+    // same alias, do nothing
+    if (existing === alias) return this
+    if (this.routers[alias]) {
+      throw new ComposieError({
+        code: COMPOSIE_ERROR_CODES.ROUTE_EXISTS,
+        message: `route for ${alias} already exists`,
+      })
+    }
+    this.aliasMap[alias] = existing
+    return this
+  }
+
+  /**
+   * remove callback for a channel
+   *  ** Note**: middlewares added by `use()` can't be removed
+   * @param channel channel name
+   * @param cb callback, if not set, remove all callbacks for the channel
+   * @returns true if removed, false if not found
+   */
+  removeRoute(channel: string, cb?: IRouterFn) {
+    // remove alias if exists
+    if (this.aliasMap[channel]) {
+      delete this.aliasMap[channel]
+      return true
+    }
+    const cbs = this.routers[channel]
+    if (!cbs || !cbs.length) return false
+    if (!cb) {
+      delete this.routers[channel]
+      return true
+    }
+    const middleware = cb[WRAPPED_MIDDLEWARE_NAME] || cb
+    const newCbs = cbs.filter(c => {
+      if (c === middleware) {
+        // clear wrapped middleware
+        delete cb[WRAPPED_MIDDLEWARE_NAME]
+        return false
+      }
+      return true
+    })
+    if (newCbs.length === cbs.length) return false
+    if (newCbs.length) {
+      this.routers[channel] = newCbs
+    } else {
+      delete this.routers[channel]
+    }
+    return true
+  }
+
+  /**
+   * remove callback for a channel, alias of removeRoute
+   */
+  off: Composie<IContext, IRouterFn>['removeRoute'] = this.removeRoute
+
   /**
    * run middlewares
    *
@@ -193,15 +349,15 @@ export default class Composie<IContext extends IBaseContext> {
    */
   run (channel: string, data?: any) {
     const ctx: IContext = this.createContext(channel, data)
-    const method = ctx.channel
+    const method = this.aliasMap[ctx.channel] || ctx.channel
     const routerCbs = this.routers[method] || []
     if (!routerCbs.length) {
       if (this.throwWhenNoRoute) {
-        routerCbs.push((ctx, next) => {
+        routerCbs.push((ctx) => {
           throw new ComposieError({
             code: COMPOSIE_ERROR_CODES.ROUTE_NOT_FOUND,
             message: `route ${method} not found`,
-            data: { channel: method, request: ctx.request }
+            data: { channel: method, request: ctx.request, originalChannel: ctx.channel}
           })
         })
       }
@@ -221,7 +377,12 @@ export default class Composie<IContext extends IBaseContext> {
   /**
    * run middlewares, alias of run
    */
-  emit: Composie<IContext>['run'] = this.run
+  emit: Composie<IContext, IRouterFn>['run'] = this.run
+  /**
+   * run middlewares, alias of run
+   */
+  call: Composie<IContext, IRouterFn>['run'] = this.run
+
 
   /**
    * add a prefix for a channel
@@ -338,3 +499,44 @@ export default class Composie<IContext extends IBaseContext> {
   }
 }
 
+
+/**
+ * convert a normal callback to a route handler
+ * @param fn normal callback
+ *  fn: (request: any) => response
+ * fn receives a request object and returns a response object(can be a promise) or undefined
+ *    if response is undefined, then it will be ignored
+ */
+const convert2middleware = createMiddlewareConverter((fn: Function) => {
+  return async function (ctx: IBaseContext, next: Function) {
+    const response = await fn(ctx.request)
+    if (typeof response !== 'undefined') {
+      ctx.response = response
+    }
+    return next()
+  }
+})
+
+
+export interface IEventBusOptions<C extends IBaseContext> extends INormalComposeOptions<C> {
+  /**
+   * convert a normal callback to a route handler
+   */
+  convertCallback2Middleware?: ((fn: Function) => IMiddleware<C>)
+}
+
+
+export type IEventCallback = (params: any) => any
+
+/**
+ * create a event bus
+ */
+export function createEventBus<
+  C extends IBaseContext,
+  IFn extends ((params: any) => any) = ((params: C['request']) => any)
+> (options: IEventBusOptions<C> = { createContext: createDefaultContext, convertCallback2Middleware: convert2middleware }) {
+  const newOptions = Object.assign({}, options)
+  newOptions.createContext = options.createContext || createDefaultContext
+  newOptions.convertCallback2Middleware = options.convertCallback2Middleware || convert2middleware
+  return new Composie<C, IFn>(newOptions)
+}

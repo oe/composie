@@ -1,7 +1,7 @@
 {
   "name": "composie",
   "version": "1.0.1",
-  "description": "compose middleware with router and run it like a charm",
+  "description": "Compose middleware with router and run it like a charm. Also serves as an advanced event bus with on, off, and emit methods.",
   "main": "dist/composie.umd.js",
   "module": "dist/composie.es.js",
   "types": "dist/composie.d.ts",
@@ -18,10 +18,11 @@
     "url": "git+https://oe@github.com/oe/composie.git"
   },
   "keywords": [
-    "compose",
-    "composie",
+    "middleware",
+    "router",
+    "event-bus",
     "koa",
-    "middleware"
+    "composie"
   ],
   "author": {
     "name": "Saiya",

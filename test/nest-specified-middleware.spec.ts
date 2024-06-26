@@ -70,8 +70,6 @@ describe('specified middleware', () => {
       ctx.response = ctx.channel + '-base'
       return next()
     })
-    // @ts-ignore
-    console.log('composie.wildcard', composie.wildcard)
     const response = await composie.run('api/demo')
     expect(response).toBe('api/demo-base-demo-demo')
   })
