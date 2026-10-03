@@ -224,6 +224,35 @@ export default class Composie<
     this.addMiddleware(key, cb!)
     return this
   }
+  /** Remove matching middleware from the global group or one exact prefix. */
+  removeMiddleware(cb?: IMiddleware<IContext>): boolean
+  removeMiddleware(prefix: string, cb?: IMiddleware<IContext>): boolean
+  removeMiddleware(prefix?: string | IMiddleware<IContext>, cb?: IMiddleware<IContext>) {
+    const key = typeof prefix === 'string' ? prefix : this.wildcard
+    const callback = typeof prefix === 'function' ? prefix : cb
+    const remove = (tree: IGlobalMiddleware<IContext>): boolean => {
+      for (const name of Object.keys(tree)) {
+        const node = tree[name]
+        let removed = false
+        if (name === key) {
+          const remaining = callback ? node.mdlws.filter(fn => fn !== callback) : []
+          removed = remaining.length !== node.mdlws.length
+          node.mdlws = remaining
+        } else if (node.children) {
+          removed = remove(node.children)
+        }
+        if (removed) {
+          if (!node.mdlws.length && (!node.children || !Object.keys(node.children).length)) {
+            delete tree[name]
+          }
+          return true
+        }
+      }
+      return false
+    }
+    return remove(this.middlewares)
+  }
+
   /**
    * add router
    * @param routers router map
@@ -269,6 +298,30 @@ export default class Composie<
    */
   on: Composie<IContext, IRouterFn>['route'] = this.route
 
+  /** Register one handler and return an idempotent disposer for that registration. */
+  subscribe(channel: string, cb: IRouterFn): () => boolean {
+    if (typeof cb !== 'function') throw new TypeError('Subscription callback must be a function')
+    const target = this.aliasMap[channel] ?? channel
+    const converted = this.fn2middleware
+      ? this.fn2middleware(cb as unknown as Function)
+      : cb as unknown as IMiddleware<IContext>
+    let subscription: IMiddleware<IContext> | undefined = (ctx, next) => converted(ctx, next)
+    this.originalCallbacks.set(subscription, { original: cb, converted })
+    if (!this.routers[target]) this.routers[target] = []
+    this.routers[target].push(subscription)
+    return () => {
+      if (!subscription) return false
+      const registered = subscription
+      subscription = undefined
+      const handlers = this.routers[target]
+      if (!handlers || handlers.indexOf(registered) < 0) return false
+      const remaining = handlers.filter(handler => handler !== registered)
+      if (remaining.length) this.routers[target] = remaining
+      else delete this.routers[target]
+      return true
+    }
+  }
+
   /**
    * add alias for a channel
    * @param existing existing channel name
@@ -289,7 +342,7 @@ export default class Composie<
 
   /**
    * remove callback for a channel
-   *  ** Note**: middlewares added by `use()` can't be removed
+   * Middleware registered with `use()` is managed by `removeMiddleware()`.
    * @param channel channel name
    * @param cb callback, if not set, remove all callbacks for the channel
    * @returns true if removed, false if not found
@@ -300,6 +353,10 @@ export default class Composie<
       delete this.aliasMap[channel]
       return true
     }
+    return this.removeHandlers(channel, cb)
+  }
+
+  private removeHandlers(channel: string, cb?: IRouterFn) {
     const cbs = this.routers[channel]
     if (!cbs || !cbs.length) return false
     if (!cb) {
@@ -561,6 +618,12 @@ export interface ITypedComposie<
 > {
   use(cb: IMiddleware<C>): ITypedComposie<Channels, C>
   use(prefix: string, cb: IMiddleware<C>): ITypedComposie<Channels, C>
+  removeMiddleware(cb?: IMiddleware<C>): boolean
+  removeMiddleware(prefix: string, cb?: IMiddleware<C>): boolean
+  subscribe<K extends ChannelNames<Channels>>(
+    channel: K,
+    callback: ITypedMiddleware<ITypedContext<Channels[K], C>>
+  ): () => boolean
   route(routers: TypedRoutes<Channels, C>): ITypedComposie<Channels, C>
   route<K extends ChannelNames<Channels>>(
     channel: K,
