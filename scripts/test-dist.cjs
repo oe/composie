@@ -12,9 +12,14 @@ async function check(exports) {
   assert.equal(await bus.emit('__proto__', 'event'), 'event')
   assert.equal(bus.off('__proto__', callback), true)
   assert.equal(await bus.emit('__proto__'), undefined)
+  const typed = exports.createTypedComposie()
+  typed.on('operation', ctx => { ctx.response = ctx.request })
+  assert.equal(await typed.run('operation', 'typed factory'), 'typed factory')
 }
 
 async function main() {
+  await check(require('composie'))
+  await check(await import('composie'))
   await check(require('../dist/composie.umd.js'))
   const esm = fs.readFileSync(require.resolve('../dist/composie.es.js'), 'utf8')
   await check(await import(`data:text/javascript;base64,${Buffer.from(esm).toString('base64')}`))

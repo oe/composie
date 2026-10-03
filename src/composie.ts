@@ -206,8 +206,8 @@ export default class Composie<
    * add global middleware
    * @param cb middleware
    */
-  use (cb: IMiddleware<IContext>)
-  use (prefix: string, cb: IMiddleware<IContext>)
+  use (cb: IMiddleware<IContext>): this
+  use (prefix: string, cb: IMiddleware<IContext>): this
   /**
    * add global middleware focus on specific channel prefix
    * @param prefix channel prefix
@@ -228,13 +228,13 @@ export default class Composie<
    * add router
    * @param routers router map
    */
-  route (routers: IRouteParam<IRouterFn>)
+  route (routers: IRouteParam<IRouterFn>): this
   /**
    * add router
    * @param channel channel name
    * @param cbs channel handlers
    */
-  route (channel: string, ...cbs: IRouterFn[])
+  route (channel: string, ...cbs: IRouterFn[]): this
   route (routers: IRouteParam<IRouterFn> | string, ...cbs: IRouterFn[]) {
     if (typeof routers === 'string') {
       routers = {
@@ -436,7 +436,7 @@ export default class Composie<
       // last called middleware #
       let index = -1
       return dispatch(0)
-      function dispatch (i) {
+      function dispatch (i: number): Promise<unknown> {
         if (i <= index) {
           return Promise.reject(new Error('next() called multiple times'))
         }
@@ -515,4 +515,75 @@ export function createEventBus<
   newOptions.createContext = options.createContext || createDefaultContext
   newOptions.convertCallback2Middleware = options.convertCallback2Middleware || convert2middleware
   return new Composie<C, IFn>(newOptions)
+}
+
+/** Request and response types for one named operation. */
+export interface IChannelDefinition<Request = unknown, Response = unknown> {
+  request: Request
+  response: Response
+}
+
+type ChannelNames<Channels> = Extract<keyof Channels, string>
+type RequestArguments<Request> = undefined extends Request
+  ? [request?: Request]
+  : [request: Request]
+
+/** Route context. The channel remains a string because calls may use aliases. */
+export type ITypedContext<Definition extends IChannelDefinition, C extends IBaseContext = IBaseContext> =
+  Omit<C, 'channel' | 'request' | 'response'> & {
+    readonly channel: string
+    readonly request: Definition['request']
+    response: Definition['response'] | undefined
+  }
+
+export type ITypedMiddleware<C> = (ctx: C, next: () => Promise<unknown>) => unknown
+
+type TypedRoutes<Channels, C extends IBaseContext> = {
+  [K in ChannelNames<Channels>]?: Channels[K] extends IChannelDefinition
+    ? ITypedMiddleware<ITypedContext<Channels[K], C>> | ITypedMiddleware<ITypedContext<Channels[K], C>>[]
+    : never
+}
+
+type TypedRun<Channels extends { [K in keyof Channels]: IChannelDefinition }> =
+  <K extends ChannelNames<Channels>>(
+    channel: K,
+    ...args: RequestArguments<Channels[NoInfer<K>]['request']>
+  ) => Promise<Channels[K]['response'] | undefined>
+
+/** An opt-in typed view of the existing Composie runtime. */
+export interface ITypedComposie<
+  Channels extends { [K in keyof Channels]: IChannelDefinition },
+  C extends IBaseContext = IBaseContext
+> {
+  use(cb: IMiddleware<C>): ITypedComposie<Channels, C>
+  use(prefix: string, cb: IMiddleware<C>): ITypedComposie<Channels, C>
+  route(routers: TypedRoutes<Channels, C>): ITypedComposie<Channels, C>
+  route<K extends ChannelNames<Channels>>(
+    channel: K,
+    ...handlers: ITypedMiddleware<ITypedContext<Channels[NoInfer<K>], C>>[]
+  ): ITypedComposie<Channels, C>
+  on: ITypedComposie<Channels, C>['route']
+  run: TypedRun<Channels>
+  emit: TypedRun<Channels>
+  call: TypedRun<Channels>
+  removeRoute<K extends ChannelNames<Channels>>(
+    channel: K,
+    callback?: ITypedMiddleware<ITypedContext<Channels[NoInfer<K>], C>>
+  ): boolean
+  off: ITypedComposie<Channels, C>['removeRoute']
+  alias<K extends ChannelNames<Channels>, Alias extends string>(
+    existing: K,
+    alias: Alias
+  ): ITypedComposie<Channels & Record<Alias, Channels[K]>, C>
+}
+
+/**
+ * Define operation contracts without changing the middleware execution model.
+ * Contracts are checked by TypeScript; payloads are not validated at runtime.
+ */
+export function createTypedComposie<
+  Channels extends { [K in keyof Channels]: IChannelDefinition },
+  C extends IBaseContext = IBaseContext
+>(options?: IComposieOptions<C>): ITypedComposie<Channels, C> {
+  return new Composie<C>(options) as unknown as ITypedComposie<Channels, C>
 }

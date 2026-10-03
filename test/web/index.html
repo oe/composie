@@ -1,17 +1,15 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta http-equiv="X-UA-Compatible" content="ie=edge">
-  <title>Composie playground</title>
-  <!-- <script src="./script.ts"></script> -->
-  <script type="module" src="./compose-await.ts"></script>
+  <title>Composie operations playground</title>
+  <script type="module" src="/examples/playground.ts"></script>
 </head>
-
 <body>
-<h1>open console to check the test result</h1>
+  <h1>Composie operations playground</h1>
+  <p>Run a user lookup, cached lookup, alias, rejected request, and ping. The trace shows logging, authentication, and short-circuiting.</p>
+  <button id="run" type="button">Run demo</button>
+  <pre id="output" aria-live="polite">Click Run demo to see the responses and middleware order.</pre>
 </body>
-
 </html>

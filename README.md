@@ -1,495 +1,216 @@
-<h1 align="center">Composie</h1>
+# Composie
 
-<div align="center">
-  <a href="https://github.com/oe/composie/actions/workflows/pages.yml">
-    <img src="https://github.com/oe/composie/actions/workflows/pages.yml/badge.svg" alt="Github Workflow">
-  </a>
-  <a href="#readme">
-    <img src="https://badges.frapsoft.com/typescript/code/typescript.svg?v=101" alt="code with typescript" height="20">
-  </a>
-  <a href="#readme">
-    <img src="https://badge.fury.io/js/composie.svg" alt="npm version" height="20">
-  </a>
-  <a href="https://www.npmjs.com/package/composie">
-    <img src="https://img.shields.io/npm/dm/composie.svg" alt="npm version" height="20">
-  </a>
-</div>
+**Koa-style middleware for named async operations, with channel routing and request/response results.**
 
-<br>
-Composie is a library similar to Koa and Koa-Router that allows you to compose middleware and run them with ease. In addition to being a middleware and routing solution, Composie can also serve as an advanced event bus with `on`, `off`, and `emit` methods.
+Use Composie when several operations need the same logging, authentication, error handling, or cache boundary. Register handlers by name, compose shared middleware, and `await` the result. It runs in Node.js and browsers, has no runtime dependencies, and does not require an HTTP server or a frontend framework.
 
-## Features
+> **Development preview:** this branch adds `createTypedComposie` and the runnable operations playground. These additions are not yet published to npm. The published `1.1.0` API uses `new Composie()` or `createEventBus()`.
 
-- **Middleware Composition**: Supports chaining and complex middleware compositions.
-- **Routing**: Based on path routing for middleware.
-- **Event Bus**: Easily handle and trigger events using `on`, `off`, and `emit`.
+## Why use it?
 
+Suppose `users/get`, `users/list`, and `system/ping` all need logging, but only user operations need authentication. You could repeat those checks inside every handler, or maintain a handler map plus your own middleware dispatcher. Composie supplies that dispatcher:
 
-## Installation
-Install via npm:
-
-```sh
-npm install composie
+```text
+run('users/get', request)
+  → global logging
+    → users/ authentication
+      → cache lookup ── hit → return cached response
+        → user handler ── miss → load and return response
+  ← logging completes, including when a handler throws
 ```
 
-Or via pnpm:
+- **Shared middleware:** apply it globally or to literal channel prefixes.
+- **Async composition:** `await next()` wraps downstream work, including errors.
+- **Short-circuiting:** set `ctx.response` and skip `next()` to stop the chain.
+- **Named results:** `run()` resolves to `ctx.response`, rather than broadcasting and discarding results.
+- **Optional TypeScript contracts:** the development preview checks each channel's request, handler response, and call result.
+
+## Install
 
 ```sh
 pnpm add composie
+# or
+npm install composie
 ```
 
-## Usage
-
-### Basic Usage
-```js
-import Composie from 'composie'; // or const { default: Composie } = require('composie');
-const composie = new Composie();
-// Add global middleware
-composie.use((ctx, next) => {
-  console.log('Global middleware');
-  return next();
-});
-
-// Add route middleware
-composie.route('api/user-info', (ctx, next) => {
-  ctx.response = 'User info';
-  return next();
-});
-
-// Run middleware
-composie.run('api/user-info').then(response => {
-  console.log(response); // 'User info'
-});
-
-// remove route
-composie.removeRoute('api/user-info');
-```
-
-### Using as an Event Bus
-```js
-const { default: Composie } = require('composie');
-const composie = new Composie();
-
-// add general middleware for all events
-composie.use(async (ctx, next) => {
-  // simulate async operation
-  await new Promise(resolve => setTimeout(resolve, 1000));
-  console.log(`Handling event: ${ctx.channel}`);
-  return next();
-});
-
-// Listen for events
-composie.on('user-registered', (ctx, next) => {
-  console.log(`Handling event for user: ${ctx.request.user}`);
-  // to continue to the next callback
-  return next();
-});
-// chain another callback
-composie.on('user-registered', (ctx, next) => {
-  if (ctx.request.user === 'Alice') {
-    ctx.response = 'Alice is registered';
-  } else {
-    // to continue to the next callback
-    return next()
-  }
-});
-// even chain more callbacks
-composie.on('user-registered', (ctx, next) => {
-  ctx.response = `User ${ctx.request.user} is not registered`;
-});
-
-// Emit events
-composie.emit('user-registered', { user: 'Alice' }).then((response) => {
-  console.log(response); // 'Alice is registered'
-});
-
-composie.emit('user-registered', { user: 'Bob' }).then((response) => {
-  console.log(response); // 'User Bob is not registered'
-});
-
-// Remove event listener
-composie.off('user-registered');
-```
-
-## API Documentation
-
-Before you get started, there are some basic concepts of this library.
-
-1. Every middleware(callback) is a function that receive two parameters `ctx` and `next`:
+## Quick start
 
 ```js
-function (ctx, next) {
-  // your logic here
-}
-```
+import Composie from 'composie';
+// CommonJS: const { default: Composie } = require('composie');
 
-2. `ctx` is an object contains request info:
+const operations = new Composie({ throwWhenNoRoute: true });
 
-```js
-{
-  // channel name, required
-  channel: 'channel name',
-  // data you passed by run or emit, optional
-  request: 'any request data'
-  // response data, you should save your result in it
-  response: 'any response data'
-  // you can add your own property to ctx to share information between middlewares
-  ...
-}
-```
-
-   1. You should save your result in `ctx.response`, you will get it in `.run`(or `.emit`) promise resolve
-   2. and you can add your own property to `ctx` to share information between middlewares
-   3. **use `return next()` or `await next()`(in async function) if you want `ctx` be processed by the next middleware, or just `return` to terminate it**
-   4. use `throw` to throw an error if an error occurred, you will catch it in `.run`(or `.emit`) promise reject
-
-### Composie
-
-Create an instance
-
-```js
-import Composie from 'composie'
-// no arguments is needed
-const composie = new Composie()
-
-```
-
-This libaray is writen in `class`, you should create an instance with `new` before use it
-
-### composie.use(middleware)
-
-Add global middleware, all invoking will proccessed by global middleware
-
-```js
-// basic usage
-composie.use(function(ctx, next) {
-  // your logic here
-  return next();
-});
-
-// advanced usage
-composie.use(async function(ctx, next) {
+operations.use(async (ctx, next) => {
+  console.log('start', ctx.channel);
   try {
-    // your logic here
     await next();
-  } catch (err) {
-    // handle error, you can throw it again or just log it
-    console.error(err);
-    // set a default response, if you want
-    ctx.response = '404 Not Found';
-    // or just throw it again, then you can catch it in `.run`(or `.emit`) promise reject
-    // throw err;
+  } finally {
+    console.log('end', ctx.channel);
   }
-})
-// chain more than one middleware
-.use(function(ctx, next) {
-  // your logic here
+});
+
+operations.use('users/', (ctx, next) => {
+  // Demo only: replace this token check with your application's authentication.
+  if (ctx.request.token !== 'demo-token') throw new Error('Unauthorized');
   return next();
 });
-```
 
-You can add more than more than one global `middleware`, they will run by the order you adding.
-
-### composie.use(channelPrefix, middleware)
-
-Add a middleware for channel has specific prefix, when run the middleware, if the channel match the prefix, then will be processed by the that middleware.
-
-```js
-composie.use('api', function(ctx, next) {
-  // your logic here
-  return next()
+operations.route('users/get', ctx => {
+  ctx.response = { id: ctx.request.id, name: 'Alice' };
 });
-```
-You can also add as many middlewares as you want for one prefix, they will be called in the order they added.
 
-Global middleware runs first, followed by matching prefixes from shortest to longest, then route handlers. Prefix matching uses literal string prefixes; `api` also matches `apiary`, so use `api/` when a slash boundary is needed. Within a prefix, handlers run in registration order. For a fallback response, `await next()` first and only set `ctx.response` if it is still `undefined`.
-
-### composie.route(channel, middleware, [middleware...])
-
-Add middlewares for a specific channel, you can add more than one at a time.
-
-`composie.on` is an alias of `composie.route`, use it as you like.
-
-```js
-composie.route(
-  "api/user",
-  function(ctx, next) {
-    // your logic here
-  },
-  function(ctx, next) {
-    // another middleware
-  }
-);
+const user = await operations.run('users/get', { id: '1', token: 'demo-token' });
+console.log(user); // { id: '1', name: 'Alice' }
 ```
 
-### composie.route({channel: [middleware...]})
+Return or await `next()` to continue; omit it to stop. Exceptions reject the promise returned by `run()`, and upstream middleware can catch them.
 
-Add middlewares for more than one channel
+## Typed operations — development preview
 
-`composie.on` is an alias of `composie.route`, use it as you like.
-
-```js
-composie.route({
-  "api/user": function(ctx, next) {
-    // your logic here
-  },
-  "api/detail": [
-    function(ctx, next) {
-      // your logic here
-    },
-    function(ctx, next) {
-      // another middleware
-    }
-  ]
-});
-```
-
-### chain `use`, `route` together
-
-You can chain `use` and `route` together
-
-```js
-composie
-  .use(function(ctx, next) {
-    // your logic here
-    // ...
-    return next();
-  })
-  .use('api', function(ctx, next) {
-    // your logic here
-    // ...
-    return next();
-  })
-  .route('api/user', function(ctx, next) {
-    // your logic here
-  })
-  // `on` is an alias of `route`
-  .on('api/detail', function(ctx, next) {
-    // your logic here
-  });
-
-```
-
-### composie.alias(existingChannel, aliasName)
-add an alias for an existing channel, when you run the alias, it will be processed by the middleware of the existing channel.
-
-```js
-composie.route('api/user', function(ctx, next) {
-  ctx.response = 'User info';
-});
-composie.alias('api/user', 'user');
-
-composie.run('user').then(response => {
-  console.log(response); // 'User info'
-});
-```
-
-
-
-### composie.removeRoute(channel, middleware?)
-Remove a middleware for a specific channel, if `middleware` is not provided, then all middlewares for that channel will be removed.
-
-`composie.off` is an alias of `composie.removeRoute`, use it as you like.
-
-```js
-composie.removeRoute('api/user');
-
-composie.off('api/user', middleware);
-```
-
-When you remove a alias, the alias will be removed, but the existing channel will be kept.
-
-Passing a callback removes all registrations of that callback on the selected channel. Other channels and event bus instances keep their registrations, including when a custom callback converter is used.
-
-
-### composie.run(channel, request?)
-
-run middleware for `channel`, it will return a promise
-
-`composie.emit` and `composie.call` are aliases of `composie.run`, use it as you like.
-
-```js
-composie.run("api/user", { id: "xxx" }).then(
-  resp => {
-    console.log("response ", resp);
-  },
-  err => {
-    console.log("error", err);
-  }
-);
-```
-### createEventBus(options)
-Utilize Composie as an Event Bus for efficient event handling in your applications.
+Use TypeScript 5.4+ and declare one request/response contract per channel:
 
 ```ts
-import { createEventBus } from 'composie';
+import { createTypedComposie } from 'composie';
 
-const eventBus = createEventBus(...)
-
-interface IEventBusOptions<IContext extends IBaseContext> {
-  /**
-   * convert a normal callback to a route handler
-   */
-  convertCallback2Middleware?: (fn: Function) => ((ctx: IContext, next: Function): any)
-  /**
-   * create context function
-   */
-  createContext?: (channel: string, request: any) => IContext
-  /**
-   * throw when no route found
-   */
-  throwWhenNoRoute?: boolean
+interface User { id: string; name: string }
+interface Operations {
+  'users/get': { request: { id: string }; response: User }
+  'system/ping': { request: void; response: string }
 }
+
+const operations = createTypedComposie<Operations>();
+
+operations.route('users/get', ctx => {
+  // ctx.request is { id: string }; ctx.response accepts User or undefined.
+  ctx.response = { id: ctx.request.id, name: 'Alice' };
+});
+operations.on('system/ping', ctx => { ctx.response = 'pong' });
+
+const user = await operations.run('users/get', { id: '1' }); // User | undefined
+const pong = await operations.emit('system/ping');          // string | undefined
+
+// TypeScript errors:
+// operations.run('users/get', { id: 123 });
+// operations.run('users/get');
+// operations.run('unknown');
 ```
 
-for detail usage check the example below
+`on`, object-based route registration, `emit`, `call`, and callback removal use the same channel contracts. A request can be omitted when its type accepts `undefined` (including `void`). The result includes `undefined`, because a chain may stop without assigning a response.
 
-
-## Use Composite as a Event Bus
+Aliases retain their target's request and response types on the returned instance:
 
 ```ts
-import { createEventBus } from 'composie';
-const eventBus = createEventBus({
-  // this is default the default converter
-  convertCallback2Middleware: (fn) => {
-    return async (ctx, next) => {
-      try {
-        const response = await fn(ctx.request);
-        if (typeof response !== 'undefined') {
-          ctx.response = response
-        }
-        return next();
-      } catch (err) {
-        throw err;
-      }
-    }
-  }
-});
-
-eventBus.use(...)
-eventBus.on('userChanged', (userInfo) => {
-  console.log(userInfo)
-})
-eventBus.emit('userChanged', { name: 'xxx', email: 'xxxx'})
+const withAlias = operations.alias('users/get', 'profile');
+const profile = await withAlias.run('profile', { id: '1' }); // User | undefined
 ```
 
+`ctx.channel` remains the caller's original channel string, including an alias. Global and prefix middleware use the shared context; route handlers get the channel-specific request and response types. Supply a second generic context type and `createContext` to add shared fields, as shown in the [complete example](examples/operations.ts).
 
+These contracts are compile-time checks, not runtime payload validation. Validate untrusted input at the boundary, and ensure shared middleware preserves the declared response contracts. The existing `Composie` class and `createEventBus` remain available for dynamic channel names and callback styles.
 
-## Advanced Example
+## Runnable example
 
-Following example shows how to use Composie as an advanced fetch module for a real world application.
-
-```js
-
-import Composie, { ComposieError } from 'composie';
-const grab = new Composie({
-  createContext: (channel, request) => ({
-    // lower case the channel name
-    channel: channel.toLowerCase(),
-    request,
-  }),
-  throwWhenNoRoute: true
-});
-
-grab.use(async (ctx, next) => {
-  try {
-    // append query string to the url
-    if (ctx.request.qs) {
-      const qs = new URLSearchParams(ctx.request.qs);
-      const url = new URL(ctx.request.url);
-      // append query string to the url, concat with the existing query string
-      url.search = new URLSearchParams([...url.searchParams, ...qs]);
-      ctx.request.url = url.toString();
-    }
-
-    await next();
-  } catch (err) {
-    if (err instanceof ComposieError) {
-      if (err.code === ComposieError.CODES.ROUTE_NOT_FOUND) {
-        console.error('Route not found');
-      } else if (err.code === '') {
-        console.error('Method not allowed');
-      }
-      console.error(err.message);
-    } else {
-      if (err.code === '401') {
-        location.path = '/login';
-      }
-    }
-  }
-});
-grab.use('post/', (ctx, next) => {
-  ctx.request.method = ctx.request.method || 'POST';
-  return next();
-});
-
-grab.on('post/json', async (ctx, next) => {
-  if (ctx.request.data) {
-   ctx.request.headers = {
-     ...ctx.request.headers,
-     'Content-Type': 'application/json'
-   };
-   ctx.request.body = JSON.stringify(ctx.request.data);
-  }
-  ctx.response = await fetch(ctx.request.url, ctx.request).then(res => res.json());
-});
-
-grab.on('post/form', async (ctx, next) => {
-  if (ctx.request.data) {
-    ctx.request.headers = {
-      ...ctx.request.headers,
-      'Content-Type': 'application/x-www-form-urlencoded'
-    };
-    ctx.request.body = new URLSearchParams(ctx.request.data);
-  }
-  ctx.response = await fetch(ctx.request.url, ctx.request).then(res => res.json());
-})
-
-
-grab.use('get/', (ctx, next) => {
-  ctx.request.method = ctx.request.method || 'GET';
-  return next();
-});
-
-
-grab.on('post/json', async (ctx, next) => {
-  ctx.response = await fetch(ctx.request.url, ctx.request).then(res => res.json());
-  return next();
-});
-
-
-grab.emit('post/json', {
-  url: 'https://jsonplaceholder.typicode.com/users/1'
-}).then((response) => {
-  console.log(response);
-});
-
-```
-
-
-## Contribution Guide
-We welcome contributions! Please read the following guide to understand how to contribute to the project.
-
-### Local development
-
-Use Node.js 22.12+ or Node.js 24, and the pnpm version pinned in `package.json`.
-If pnpm is not installed, run `npm install --global pnpm@12.8.1` first.
+On this development branch, [examples/operations.ts](examples/operations.ts) combines logging, prefix authentication, a cache, two user operations, and an alias. The in-memory token check is illustrative; it is not a production authentication implementation.
 
 ```sh
 pnpm install --frozen-lockfile
-pnpm dev             # Vite playground at /test/web/
-pnpm test            # Vitest with coverage
-pnpm typecheck       # library, tests, and Vite configuration
-pnpm build           # checks, Vite library bundles, and TypeScript declarations
-pnpm test:dist       # CommonJS, ES module, and browser UMD smoke checks
+pnpm dev
 ```
 
-The library build preserves `dist/composie.umd.js`, `dist/composie.es.js`, and `dist/composie.d.ts`. Vite bundles the JavaScript; TypeScript emits the declarations. The Node.js requirement applies to the development tools, while the library bundles target ES2015.
+Open the playground at `/test/web/` and click **Run demo**. It shows a first load, a cache hit, an alias call, a rejected request, and an operation outside the authenticated prefix. The example has regression tests that verify authentication still runs before a cached response is returned.
 
-## Submitting Issues
-If you find a bug or have a feature request, please submit an issue detailing the problem or suggestion.
+## When to choose Composie
 
-## Submitting Pull Requests
-1. Fork the repository
-2. Create a new branch (`git checkout -b feature-branch`)
-3. Commit your changes (`git commit -am 'message'`)
+| Requirement | A suitable choice |
+| --- | --- |
+| Tiny, synchronous event notifications | [mitt](https://github.com/developit/mitt) |
+| A familiar EventEmitter API with `once` | [EventEmitter3](https://github.com/primus/eventemitter3) |
+| Async event broadcasting, including serial listener execution | [Emittery](https://github.com/sindresorhus/emittery) |
+| Compose middleware for a single pipeline | [koa-compose](https://github.com/koajs/compose) |
+| A fetch client with HTTP features and retry helpers | [wretch](https://github.com/elbywan/wretch) |
+| Named async operations with prefix middleware, short-circuiting, and a shared response | **Composie** |
+
+Composie is useful when those middleware and dispatch concerns appear together. It does not provide HTTP transport, URL parameters, a task queue, durable messaging, or parallel event broadcasting.
+
+## API
+
+### Context and execution order
+
+A context contains `channel`, `request`, and a mutable `response`. `createContext(channel, request)` can add shared application fields. The default context starts without a response.
+
+The execution order is **global middleware → matching prefixes from shortest to longest → route handlers**. Within a group, handlers run in registration order. Middleware after `await next()` runs in reverse order, like Koa's onion model.
+
+Prefixes are literal string prefixes: `api` also matches `apiary`; use `api/` when a slash boundary is needed. Aliases select their target's route and prefix middleware, while `ctx.channel` keeps the original name. Aliases resolve one level; point them at the original operation instead of chaining aliases.
+
+### Registration and removal
+
+| Method | Behavior |
+| --- | --- |
+| `use(middleware)` | Add global middleware. |
+| `use(prefix, middleware)` | Add middleware for matching prefixes. |
+| `route(channel, ...handlers)` / `on(...)` | Append handlers for a channel. |
+| `route({ channel: handlerOrArray })` | Register several channels. |
+| `alias(existingChannel, aliasName)` | Add an alias; throws `ROUTE_EXISTS` if the alias name already has a route. |
+| `removeRoute(channel, callback?)` / `off(...)` | Remove every registration of that callback on the channel, or all handlers when omitted. Return whether anything was removed. Removing an alias removes the alias and keeps its target. |
+| `run(channel, request?)` / `emit(...)` / `call(...)` | Run the chain and return a promise for `ctx.response`. |
+
+Registration methods support chaining. Middleware added through `use()` cannot currently be removed. Removing route callbacks leaves their registrations on other channels and instances intact.
+
+### Options and errors
+
+```js
+const operations = new Composie({
+  createContext: (channel, request) => ({ channel, request, response: undefined }),
+  throwWhenNoRoute: true,
+});
+```
+
+`throwWhenNoRoute` defaults to `false`. Without a route, matching middleware still runs. When enabled, a missing route reaches an error handler after middleware, so upstream middleware can catch `ComposieError` with code `ROUTE_NOT_FOUND` or short-circuit with its own response. Middleware errors and context-factory errors reject the returned promise. Calling the same `next()` more than once rejects with an error.
+
+For a fallback, continue first and assign a response only if none was produced:
+
+```js
+operations.use(async (ctx, next) => {
+  await next();
+  if (ctx.response === undefined) ctx.response = 'fallback';
+});
+```
+
+With `throwWhenNoRoute: true`, catch `ROUTE_NOT_FOUND` if you want to turn that error into a fallback response.
+
+### Callback-style event bus
+
+```js
+import { createEventBus } from 'composie';
+
+const events = createEventBus();
+const listener = async user => `Welcome, ${user.name}`;
+
+events.on('user/registered', listener);
+console.log(await events.emit('user/registered', { name: 'Alice' }));
+events.off('user/registered', listener);
+```
+
+The default converter awaits callbacks sequentially. The last callback returning a defined value supplies the response; `undefined` does not overwrite it. A rejection stops the chain. This is different from parallel event fan-out. `use()` still accepts `(ctx, next)` middleware, and `createEventBus` supports `createContext`, `throwWhenNoRoute`, and `convertCallback2Middleware` options.
+
+## Development
+
+Use Node.js 22.12+ or Node.js 24 and the pnpm version pinned in `package.json`. If needed, install it with `npm install --global pnpm@12.8.1`.
+
+```sh
+pnpm install --frozen-lockfile
+pnpm dev          # Vite playground
+pnpm test         # Vitest with coverage
+pnpm typecheck    # source, tests, examples, config, and positive/negative type fixtures
+pnpm build        # checks, Vite bundles, and TypeScript declarations
+pnpm test:dist    # CommonJS, ES module, and browser UMD smoke checks
+```
+
+The build preserves `dist/composie.umd.js`, `dist/composie.es.js`, and `dist/composie.d.ts`, with an ES2015 JavaScript target. Additional `dist/composie.mjs` and `dist/composie.d.mts` entries with conditional exports support native Node.js ESM imports while retaining CommonJS imports. A publish-only validation hook checks the build and distribution before an explicit npm release. This development preview has not been released.
+
+Bug reports and focused contributions are welcome through [GitHub issues](https://github.com/oe/composie/issues) and pull requests. Include a runnable reproduction and tests for behavior changes.
+
+## License
+
+[MIT](LICENSE)

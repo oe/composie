@@ -1,8 +1,16 @@
 {
   "extends": "./tsconfig.json",
   "compilerOptions": {
-    "types": ["vitest/globals", "node"],
+    "types": [
+      "vitest/globals",
+      "node"
+    ],
     "target": "es2020"
   },
-  "include": ["src/**/*.ts", "test/**/*.ts", "vite.config.mts"]
+  "include": [
+    "src/**/*.ts",
+    "test/**/*.ts",
+    "vite.config.mts",
+    "examples/**/*.ts"
+  ]
 }
