@@ -187,6 +187,9 @@ export default class Composie<
   /** Original callbacks for converted handlers, isolated to this instance. */
   private originalCallbacks = new WeakMap<IMiddleware<IContext>, { original: IRouterFn; converted: IMiddleware<IContext> }>()
 
+  /** Original callbacks behind independently disposable subscriptions. */
+  private subscriptionCallbacks = new WeakMap<Function, IRouterFn>()
+
   constructor (options: IComposieOptions<IContext> = createDefaultContext) {
     if (typeof options === 'function') {
       this.createContext = options
@@ -224,6 +227,35 @@ export default class Composie<
     this.addMiddleware(key, cb!)
     return this
   }
+  /** Remove matching middleware from the global group or one exact prefix. */
+  removeMiddleware(cb?: IMiddleware<IContext>): boolean
+  removeMiddleware(prefix: string, cb?: IMiddleware<IContext>): boolean
+  removeMiddleware(prefix?: string | IMiddleware<IContext>, cb?: IMiddleware<IContext>) {
+    const key = typeof prefix === 'string' ? prefix : this.wildcard
+    const callback = typeof prefix === 'function' ? prefix : cb
+    const remove = (tree: IGlobalMiddleware<IContext>): boolean => {
+      for (const name of Object.keys(tree)) {
+        const node = tree[name]
+        let removed = false
+        if (name === key) {
+          const remaining = callback ? node.mdlws.filter(fn => fn !== callback) : []
+          removed = remaining.length !== node.mdlws.length
+          node.mdlws = remaining
+        } else if (node.children) {
+          removed = remove(node.children)
+        }
+        if (removed) {
+          if (!node.mdlws.length && (!node.children || !Object.keys(node.children).length)) {
+            delete tree[name]
+          }
+          return true
+        }
+      }
+      return false
+    }
+    return remove(this.middlewares)
+  }
+
   /**
    * add router
    * @param routers router map
@@ -269,6 +301,24 @@ export default class Composie<
    */
   on: Composie<IContext, IRouterFn>['route'] = this.route
 
+  /** Register one handler and return an idempotent disposer for that registration. */
+  subscribe(channel: string, cb: IRouterFn): () => boolean {
+    if (typeof cb !== 'function') throw new TypeError('Subscription callback must be a function')
+    const target = this.aliasMap[channel] ?? channel
+    const callback = cb as unknown as Function
+    let subscription: IRouterFn | undefined = ((...args: any[]) => callback(...args)) as unknown as IRouterFn
+    this.route(channel, subscription)
+    this.subscriptionCallbacks.set(subscription as unknown as Function, cb)
+    return () => {
+      if (!subscription) return false
+      const registered = subscription
+      subscription = undefined
+      const removed = this.removeHandlers(target, registered)
+      this.subscriptionCallbacks.delete(registered as unknown as Function)
+      return removed
+    }
+  }
+
   /**
    * add alias for a channel
    * @param existing existing channel name
@@ -289,7 +339,7 @@ export default class Composie<
 
   /**
    * remove callback for a channel
-   *  ** Note**: middlewares added by `use()` can't be removed
+   * Middleware registered with `use()` is managed by `removeMiddleware()`.
    * @param channel channel name
    * @param cb callback, if not set, remove all callbacks for the channel
    * @returns true if removed, false if not found
@@ -300,6 +350,10 @@ export default class Composie<
       delete this.aliasMap[channel]
       return true
     }
+    return this.removeHandlers(channel, cb)
+  }
+
+  private removeHandlers(channel: string, cb?: IRouterFn) {
     const cbs = this.routers[channel]
     if (!cbs || !cbs.length) return false
     if (!cb) {
@@ -308,7 +362,9 @@ export default class Composie<
     }
     const newCbs = cbs.filter(c => {
       const registration = this.originalCallbacks.get(c)
-      return c !== cb && registration?.original !== cb && registration?.converted !== cb
+      const original = registration ? registration.original : c
+      const subscriber = typeof original === 'function' ? this.subscriptionCallbacks.get(original) : undefined
+      return c !== cb && registration?.original !== cb && registration?.converted !== cb && subscriber !== cb
     })
     if (newCbs.length === cbs.length) return false
     if (newCbs.length) {
@@ -561,6 +617,12 @@ export interface ITypedComposie<
 > {
   use(cb: IMiddleware<C>): ITypedComposie<Channels, C>
   use(prefix: string, cb: IMiddleware<C>): ITypedComposie<Channels, C>
+  removeMiddleware(cb?: IMiddleware<C>): boolean
+  removeMiddleware(prefix: string, cb?: IMiddleware<C>): boolean
+  subscribe<K extends ChannelNames<Channels>>(
+    channel: K,
+    callback: ITypedMiddleware<ITypedContext<Channels[K], C>>
+  ): () => boolean
   route(routers: TypedRoutes<Channels, C>): ITypedComposie<Channels, C>
   route<K extends ChannelNames<Channels>>(
     channel: K,

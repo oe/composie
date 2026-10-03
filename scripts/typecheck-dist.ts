@@ -20,3 +20,10 @@ const required: Promise<{ name: string }> = app.run('lookup', { id: '1' })
 
 new Composie().route('dynamic', ctx => { ctx.response = ctx.request }).run('dynamic', 42)
 createEventBus().on('dynamic', request => request).emit('dynamic', 42)
+
+const cleanup: () => boolean = app.subscribe('lookup', ctx => { ctx.response = { name: ctx.request.id } })
+const removed: boolean = app.removeMiddleware('lookup')
+// @ts-expect-error subscription declarations reject unknown channels
+app.subscribe('missing', () => {})
+// @ts-expect-error subscription declarations check response types
+app.subscribe('lookup', ctx => { ctx.response = 42 })

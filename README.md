@@ -156,7 +156,7 @@ Prefixes are literal string prefixes: `api` also matches `apiary`; use `api/` wh
 | `removeRoute(channel, callback?)` / `off(...)` | Remove every registration of that callback on the channel, or all handlers when omitted. Return whether anything was removed. Removing an alias removes the alias and keeps its target. |
 | `run(channel, request?)` / `emit(...)` / `call(...)` | Run the chain and return a promise for `ctx.response`. |
 
-Registration methods support chaining. Middleware added through `use()` cannot currently be removed. Removing route callbacks leaves their registrations on other channels and instances intact.
+Registration methods support chaining. Removing route callbacks leaves their registrations on other channels and instances intact.
 
 ### Options and errors
 
@@ -194,6 +194,25 @@ events.off('user/registered', listener);
 ```
 
 The default converter awaits callbacks sequentially. The last callback returning a defined value supplies the response; `undefined` does not overwrite it. A rejection stops the chain. This is different from parallel event fan-out. `use()` still accepts `(ctx, next)` middleware, and `createEventBus` supports `createContext`, `throwWhenNoRoute`, and `convertCallback2Middleware` options.
+
+## Lifecycle cleanup — unreleased
+
+The following additions are on the development branch and are not part of npm 1.2.0. They help applications clean up handlers and shared middleware when a component or plugin is unmounted.
+
+```js
+const dispose = events.subscribe('user/registered', listener);
+// Remove this subscription only, leaving other registrations of listener intact.
+const removed = dispose(); // true if the registration was still present
+// Further calls return false.
+
+const authorize = (ctx, next) => next();
+operations.use('users/', authorize);
+operations.removeMiddleware('users/', authorize);
+```
+
+`subscribe(channel, callback)` accepts the same handler as `on()` and returns an idempotent `() => boolean` disposer. For `createEventBus`, callbacks receive the request; normal and typed Composie callbacks receive `(ctx, next)`. A disposer removes only its own registration, even when the same callback has been registered more than once. It captures the target at registration time, so later alias removal or reassignment does not change which handler it removes. It does not remove the alias itself. Existing `off(channel, callback)` still removes all matching registrations on a canonical channel, including subscriptions; calling `off` with an alias still removes that alias.
+
+`removeMiddleware(callback?)` removes matching global middleware, or the whole global group when the callback is omitted. `removeMiddleware(prefix, callback?)` acts on one exact prefix group, preserving its child prefixes. It removes every registration of a supplied callback in that group and returns whether anything was removed. Empty tree nodes are pruned after cleanup. Both APIs affect future dispatches; a dispatch already started keeps its middleware and handler snapshot.
 
 ## Development
 

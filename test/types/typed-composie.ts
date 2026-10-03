@@ -78,3 +78,13 @@ app.run('profile', { id: '1' })
 // Existing APIs still accept dynamic channel names and custom event callbacks.
 new Composie().on('dynamic', (ctx, next) => next()).run('anything', 42)
 createEventBus().on('dynamic', value => value).emit('anything', 42)
+
+const dispose: () => boolean = app.subscribe('users/get', callback)
+const removed: boolean = app.removeMiddleware('users/')
+app.removeMiddleware((ctx, next) => next())
+// @ts-expect-error unknown subscription channel
+app.subscribe('missing', callback)
+// @ts-expect-error subscription callback belongs to another channel
+app.subscribe('users/list', callback)
+// @ts-expect-error subscription context response is checked
+app.subscribe('users/get', ctx => { ctx.response = 123 })
