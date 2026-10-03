@@ -32,17 +32,17 @@ Install via npm:
 npm install composie
 ```
 
-Or via yarn:
+Or via pnpm:
 
 ```sh
-yarn add composie
+pnpm add composie
 ```
 
 ## Usage
 
 ### Basic Usage
 ```js
-import Composie from 'composie'; // or const Composie = require('composie');
+import Composie from 'composie'; // or const { default: Composie } = require('composie');
 const composie = new Composie();
 // Add global middleware
 composie.use((ctx, next) => {
@@ -62,18 +62,18 @@ composie.run('api/user-info').then(response => {
 });
 
 // remove route
-composie.remove('api/user-info');
+composie.removeRoute('api/user-info');
 ```
 
 ### Using as an Event Bus
 ```js
-const Composie = require('composie');
+const { default: Composie } = require('composie');
 const composie = new Composie();
 
 // add general middleware for all events
 composie.use(async (ctx, next) => {
   // simulate async operation
-  await Promise(resolve => setTimeout(resolve, 1000));
+  await new Promise(resolve => setTimeout(resolve, 1000));
   console.log(`Handling event: ${ctx.channel}`);
   return next();
 });
@@ -202,6 +202,8 @@ composie.use('api', function(ctx, next) {
 ```
 You can also add as many middlewares as you want for one prefix, they will be called in the order they added.
 
+Global middleware runs first, followed by matching prefixes from shortest to longest, then route handlers. Prefix matching uses literal string prefixes; `api` also matches `apiary`, so use `api/` when a slash boundary is needed. Within a prefix, handlers run in registration order. For a fallback response, `await next()` first and only set `ctx.response` if it is still `undefined`.
+
 ### composie.route(channel, middleware, [middleware...])
 
 Add middlewares for a specific channel, you can add more than one at a time.
@@ -209,7 +211,7 @@ Add middlewares for a specific channel, you can add more than one at a time.
 `composie.on` is an alias of `composie.route`, use it as you like.
 
 ```js
-compose.route(
+composie.route(
   "api/user",
   function(ctx, next) {
     // your logic here
@@ -227,7 +229,7 @@ Add middlewares for more than one channel
 `composie.on` is an alias of `composie.route`, use it as you like.
 
 ```js
-compose.route({
+composie.route({
   "api/user": function(ctx, next) {
     // your logic here
   },
@@ -247,13 +249,13 @@ compose.route({
 You can chain `use` and `route` together
 
 ```js
-compose
+composie
   .use(function(ctx, next) {
     // your logic here
     // ...
     return next();
   })
-  .use('api', function(ctx, nexdt) {
+  .use('api', function(ctx, next) {
     // your logic here
     // ...
     return next();
@@ -292,10 +294,12 @@ Remove a middleware for a specific channel, if `middleware` is not provided, the
 ```js
 composie.removeRoute('api/user');
 
-compose.off('api/user', middleware);
+composie.off('api/user', middleware);
 ```
 
 When you remove a alias, the alias will be removed, but the existing channel will be kept.
+
+Passing a callback removes all registrations of that callback on the selected channel. Other channels and event bus instances keep their registrations, including when a custom callback converter is used.
 
 
 ### composie.run(channel, request?)
@@ -305,7 +309,7 @@ run middleware for `channel`, it will return a promise
 `composie.emit` and `composie.call` are aliases of `composie.run`, use it as you like.
 
 ```js
-compose.run("api/user", { id: "xxx" }).then(
+composie.run("api/user", { id: "xxx" }).then(
   resp => {
     console.log("response ", resp);
   },
@@ -383,9 +387,9 @@ const grab = new Composie({
     // lower case the channel name
     channel: channel.toLowerCase(),
     request,
-  },
+  }),
   throwWhenNoRoute: true
-));
+});
 
 grab.use(async (ctx, next) => {
   try {
@@ -419,7 +423,7 @@ grab.use('post/', (ctx, next) => {
   return next();
 });
 
-grab.on('post/json', (ctx, next) => {
+grab.on('post/json', async (ctx, next) => {
   if (ctx.request.data) {
    ctx.request.headers = {
      ...ctx.request.headers,
@@ -427,7 +431,7 @@ grab.on('post/json', (ctx, next) => {
    };
    ctx.request.body = JSON.stringify(ctx.request.data);
   }
-  ctx.response = await fetch(ctx.request).then(res => res.json());
+  ctx.response = await fetch(ctx.request.url, ctx.request).then(res => res.json());
 });
 
 grab.on('post/form', async (ctx, next) => {
@@ -438,7 +442,7 @@ grab.on('post/form', async (ctx, next) => {
     };
     ctx.request.body = new URLSearchParams(ctx.request.data);
   }
-  ctx.response = await fetch(ctx.request).then(res => res.json());
+  ctx.response = await fetch(ctx.request.url, ctx.request).then(res => res.json());
 })
 
 
@@ -449,7 +453,7 @@ grab.use('get/', (ctx, next) => {
 
 
 grab.on('post/json', async (ctx, next) => {
-  ctx.response = await fetch(ctx.request).then(res => res.json());
+  ctx.response = await fetch(ctx.request.url, ctx.request).then(res => res.json());
   return next();
 });
 
@@ -465,6 +469,22 @@ grab.emit('post/json', {
 
 ## Contribution Guide
 We welcome contributions! Please read the following guide to understand how to contribute to the project.
+
+### Local development
+
+Use Node.js 22.12+ or Node.js 24, and the pnpm version pinned in `package.json`.
+If pnpm is not installed, run `npm install --global pnpm@12.8.1` first.
+
+```sh
+pnpm install --frozen-lockfile
+pnpm dev             # Vite playground at /test/web/
+pnpm test            # Vitest with coverage
+pnpm typecheck       # library, tests, and Vite configuration
+pnpm build           # checks, Vite library bundles, and TypeScript declarations
+pnpm test:dist       # CommonJS, ES module, and browser UMD smoke checks
+```
+
+The library build preserves `dist/composie.umd.js`, `dist/composie.es.js`, and `dist/composie.d.ts`. Vite bundles the JavaScript; TypeScript emits the declarations. The Node.js requirement applies to the development tools, while the library bundles target ES2015.
 
 ## Submitting Issues
 If you find a bug or have a feature request, please submit an issue detailing the problem or suggestion.
