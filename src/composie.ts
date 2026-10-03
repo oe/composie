@@ -185,7 +185,7 @@ export default class Composie<
   private aliasMap: { [k: string]: string } = Object.create(null)
 
   /** Original callbacks for converted handlers, isolated to this instance. */
-  private originalCallbacks = new WeakMap<IMiddleware<IContext>, IRouterFn>()
+  private originalCallbacks = new WeakMap<IMiddleware<IContext>, { original: IRouterFn; converted: IMiddleware<IContext> }>()
 
   constructor (options: IComposieOptions<IContext> = createDefaultContext) {
     if (typeof options === 'function') {
@@ -206,8 +206,8 @@ export default class Composie<
    * add global middleware
    * @param cb middleware
    */
-  use (cb: IMiddleware<IContext>): this
-  use (prefix: string, cb: IMiddleware<IContext>): this
+  use (cb: IMiddleware<IContext>): any
+  use (prefix: string, cb: IMiddleware<IContext>): any
   /**
    * add global middleware focus on specific channel prefix
    * @param prefix channel prefix
@@ -228,13 +228,13 @@ export default class Composie<
    * add router
    * @param routers router map
    */
-  route (routers: IRouteParam<IRouterFn>): this
+  route (routers: IRouteParam<IRouterFn>): any
   /**
    * add router
    * @param channel channel name
    * @param cbs channel handlers
    */
-  route (channel: string, ...cbs: IRouterFn[]): this
+  route (channel: string, ...cbs: IRouterFn[]): any
   route (routers: IRouteParam<IRouterFn> | string, ...cbs: IRouterFn[]) {
     if (typeof routers === 'string') {
       routers = {
@@ -252,8 +252,9 @@ export default class Composie<
       if (this.fn2middleware) {
         // @ts-ignore
         cbs = cbs.map(cb => {
-          const middleware = this.fn2middleware!(cb as Function)
-          this.originalCallbacks.set(middleware, cb)
+          const converted = this.fn2middleware!(cb as Function)
+          const middleware: IMiddleware<IContext> = (ctx, next) => converted(ctx, next)
+          this.originalCallbacks.set(middleware, { original: cb, converted })
           return middleware
         })
       }
@@ -305,7 +306,10 @@ export default class Composie<
       delete this.routers[channel]
       return true
     }
-    const newCbs = cbs.filter(c => c !== cb && this.originalCallbacks.get(c) !== cb)
+    const newCbs = cbs.filter(c => {
+      const registration = this.originalCallbacks.get(c)
+      return c !== cb && registration?.original !== cb && registration?.converted !== cb
+    })
     if (newCbs.length === cbs.length) return false
     if (newCbs.length) {
       this.routers[channel] = newCbs
@@ -327,25 +331,25 @@ export default class Composie<
    * @param data ctx.request when run
    */
   run (channel: string, data?: any) {
-    return new Promise((resolve, reject) => {
-      const ctx: IContext = this.createContext(channel, data)
-      const method = this.aliasMap[ctx.channel] ?? ctx.channel
-      const routerCbs = this.routers[method] || []
-      if (!routerCbs.length) {
-        if (this.throwWhenNoRoute) {
-          routerCbs.push((ctx) => {
-            throw new ComposieError({
-              code: COMPOSIE_ERROR_CODES.ROUTE_NOT_FOUND,
-              message: `route ${method} not found`,
-              data: { channel: method, request: ctx.request, originalChannel: ctx.channel}
-            })
+    const ctx: IContext = this.createContext(channel, data)
+    const method = this.aliasMap[ctx.channel] ?? ctx.channel
+    const routerCbs = this.routers[method] || []
+    if (!routerCbs.length) {
+      if (this.throwWhenNoRoute) {
+        routerCbs.push((ctx) => {
+          throw new ComposieError({
+            code: COMPOSIE_ERROR_CODES.ROUTE_NOT_FOUND,
+            message: `route ${method} not found`,
+            data: { channel: method, request: ctx.request, originalChannel: ctx.channel}
           })
-        }
+        })
       }
-      const cbs = this.getMiddlewares(method)
-      cbs.push(...routerCbs)
+    }
+    const cbs = this.getMiddlewares(method)
+    cbs.push(...routerCbs)
+    return new Promise((resolve, reject) => {
       if (cbs.length) {
-        this.composeMiddlewares(cbs)(ctx).then(() => resolve(ctx.response), reject)
+        this.composeMiddlewares(cbs)(ctx).then(() => resolve(ctx.response)).catch(reject)
       } else {
         resolve(undefined)
       }
@@ -436,7 +440,7 @@ export default class Composie<
       // last called middleware #
       let index = -1
       return dispatch(0)
-      function dispatch (i: number): Promise<unknown> {
+      function dispatch (i: number): Promise<any> {
         if (i <= index) {
           return Promise.reject(new Error('next() called multiple times'))
         }
@@ -525,12 +529,12 @@ export interface IChannelDefinition<Request = unknown, Response = unknown> {
 
 type ChannelNames<Channels> = Extract<keyof Channels, string>
 type RequestArguments<Request> = undefined extends Request
-  ? [request?: Request]
-  : [request: Request]
+  ? [Request?]
+  : [Request]
 
 /** Route context. The channel remains a string because calls may use aliases. */
 export type ITypedContext<Definition extends IChannelDefinition, C extends IBaseContext = IBaseContext> =
-  Omit<C, 'channel' | 'request' | 'response'> & {
+  Pick<C, Exclude<keyof C, 'channel' | 'request' | 'response'>> & {
     readonly channel: string
     readonly request: Definition['request']
     response: Definition['response'] | undefined
@@ -547,7 +551,7 @@ type TypedRoutes<Channels, C extends IBaseContext> = {
 type TypedRun<Channels extends { [K in keyof Channels]: IChannelDefinition }> =
   <K extends ChannelNames<Channels>>(
     channel: K,
-    ...args: RequestArguments<Channels[NoInfer<K>]['request']>
+    ...args: RequestArguments<Channels[K]['request']>
   ) => Promise<Channels[K]['response'] | undefined>
 
 /** An opt-in typed view of the existing Composie runtime. */
@@ -560,7 +564,7 @@ export interface ITypedComposie<
   route(routers: TypedRoutes<Channels, C>): ITypedComposie<Channels, C>
   route<K extends ChannelNames<Channels>>(
     channel: K,
-    ...handlers: ITypedMiddleware<ITypedContext<Channels[NoInfer<K>], C>>[]
+    ...handlers: ITypedMiddleware<ITypedContext<Channels[K], C>>[]
   ): ITypedComposie<Channels, C>
   on: ITypedComposie<Channels, C>['route']
   run: TypedRun<Channels>
@@ -568,7 +572,7 @@ export interface ITypedComposie<
   call: TypedRun<Channels>
   removeRoute<K extends ChannelNames<Channels>>(
     channel: K,
-    callback?: ITypedMiddleware<ITypedContext<Channels[NoInfer<K>], C>>
+    callback?: ITypedMiddleware<ITypedContext<Channels[K], C>>
   ): boolean
   off: ITypedComposie<Channels, C>['removeRoute']
   alias<K extends ChannelNames<Channels>, Alias extends string>(

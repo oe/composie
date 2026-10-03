@@ -31,3 +31,7 @@ jobs:
         run: pnpm build
       - name: Verify distribution formats
         run: pnpm test:dist
+      - name: Verify legacy TypeScript consumers
+        run: |
+          npx --yes --package typescript@3.0.3 tsc -p tsconfig.legacy.json
+          npx --yes --package typescript@3.9.10 tsc -p tsconfig.legacy.json

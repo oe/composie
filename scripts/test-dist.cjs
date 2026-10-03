@@ -18,8 +18,10 @@ async function check(exports) {
 }
 
 async function main() {
-  await check(require('composie'))
-  await check(await import('composie'))
+  await check(require('..'))
+  const legacyNativeImport = await import(require.resolve('../dist/composie.umd.js'))
+  await check(legacyNativeImport.default)
+  await check(await import('../dist/composie.mjs'))
   await check(require('../dist/composie.umd.js'))
   const esm = fs.readFileSync(require.resolve('../dist/composie.es.js'), 'utf8')
   await check(await import(`data:text/javascript;base64,${Buffer.from(esm).toString('base64')}`))

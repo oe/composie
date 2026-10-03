@@ -52,19 +52,5 @@
     "vite": "^8.3.2",
     "vitest": "^5.0.3"
   },
-  "packageManager": "pnpm@12.8.1",
-  "exports": {
-    ".": {
-      "import": {
-        "types": "./dist/composie.d.mts",
-        "default": "./dist/composie.mjs"
-      },
-      "require": {
-        "types": "./dist/composie.d.ts",
-        "default": "./dist/composie.umd.js"
-      }
-    },
-    "./dist/*": "./dist/*",
-    "./package.json": "./package.json"
-  }
+  "packageManager": "pnpm@12.8.1"
 }

@@ -102,10 +102,10 @@ describe('registration regressions', () => {
 })
 
 describe('execution regressions', () => {
-  it('rejects context factory errors through the returned promise', async () => {
+  it('preserves synchronous context factory errors', () => {
     const error = new Error('context failed')
     const app = new Composie(() => { throw error })
-    await expect(app.run('event')).rejects.toBe(error)
+    expect(() => app.run('event')).toThrow(error)
   })
 
   it('preserves onion order and isolates concurrent contexts', async () => {
@@ -123,5 +123,26 @@ describe('execution regressions', () => {
     expect(await Promise.all([app.run('event', 'one'), app.run('event', 'two')])).toEqual([
       ['one', 'before', 'route', 'after'], ['two', 'before', 'route', 'after']
     ])
+  })
+})
+
+describe('context accessor compatibility', () => {
+  it('rejects errors thrown while reading a completed response', async () => {
+    const error = new Error('response getter failed')
+    const app = new Composie((channel, request) => ({
+      channel, request,
+      get response() { throw error },
+    }))
+    app.on('event', () => {})
+    await expect(app.run('event')).rejects.toBe(error)
+  })
+
+  it('preserves synchronous channel accessor errors during preparation', () => {
+    const error = new Error('channel getter failed')
+    const app = new Composie(() => ({
+      get channel(): string { throw error },
+      request: undefined, response: undefined,
+    }))
+    expect(() => app.run('event')).toThrow(error)
   })
 })

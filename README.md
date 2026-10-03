@@ -38,6 +38,7 @@ npm install composie
 ```js
 import Composie from 'composie';
 // CommonJS: const { default: Composie } = require('composie');
+// Native Node.js ESM: import Composie from 'composie/dist/composie.mjs';
 
 const operations = new Composie({ throwWhenNoRoute: true });
 
@@ -68,7 +69,7 @@ Return or await `next()` to continue; omit it to stop. Exceptions reject the pro
 
 ## Typed operations — development preview
 
-Use TypeScript 5.4+ and declare one request/response contract per channel:
+Declare one request/response contract per channel:
 
 ```ts
 import { createTypedComposie } from 'composie';
@@ -166,7 +167,7 @@ const operations = new Composie({
 });
 ```
 
-`throwWhenNoRoute` defaults to `false`. Without a route, matching middleware still runs. When enabled, a missing route reaches an error handler after middleware, so upstream middleware can catch `ComposieError` with code `ROUTE_NOT_FOUND` or short-circuit with its own response. Middleware errors and context-factory errors reject the returned promise. Calling the same `next()` more than once rejects with an error.
+`throwWhenNoRoute` defaults to `false`. Without a route, matching middleware still runs. When enabled, a missing route reaches an error handler after middleware, so upstream middleware can catch `ComposieError` with code `ROUTE_NOT_FOUND` or short-circuit with its own response. Middleware errors reject the returned promise. For compatibility with 1.1.0, context-factory errors throw synchronously before a promise is returned. Calling the same `next()` more than once rejects with an error.
 
 For a fallback, continue first and assign a response only if none was produced:
 
@@ -207,7 +208,7 @@ pnpm build        # checks, Vite bundles, and TypeScript declarations
 pnpm test:dist    # CommonJS, ES module, and browser UMD smoke checks
 ```
 
-The build preserves `dist/composie.umd.js`, `dist/composie.es.js`, and `dist/composie.d.ts`, with an ES2015 JavaScript target. Additional `dist/composie.mjs` and `dist/composie.d.mts` entries with conditional exports support native Node.js ESM imports while retaining CommonJS imports. A publish-only validation hook checks the build and distribution before an explicit npm release. This development preview has not been released.
+The build preserves `dist/composie.umd.js`, `dist/composie.es.js`, and `dist/composie.d.ts`, with an ES2015 JavaScript target. Additional `dist/composie.mjs` and `dist/composie.d.mts` entries provide an opt-in native ESM import: `import Composie from 'composie/dist/composie.mjs'`. The existing package entry and deep import paths remain available. Native Node.js imports of the package root keep the CommonJS namespace default (`const { default: Composie } = namespace`); bundlers continue to use the `module` entry. A publish-only validation hook checks the build and distribution before an explicit npm release. This development preview has not been released.
 
 Bug reports and focused contributions are welcome through [GitHub issues](https://github.com/oe/composie/issues) and pull requests. Include a runnable reproduction and tests for behavior changes.
 

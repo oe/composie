@@ -1,4 +1,4 @@
-import Composie, { createTypedComposie } from 'composie'
+import Composie, { createTypedComposie } from '../dist/composie.mjs'
 
 new Composie().on('dynamic', ctx => { ctx.response = ctx.request })
 const app = createTypedComposie<{

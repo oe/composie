@@ -1,4 +1,4 @@
-import Composie, { createEventBus, createTypedComposie } from 'composie'
+import Composie, { createEventBus, createTypedComposie } from '..'
 
 interface Operations {
   lookup: { request: { id: string }; response: { name: string } }
