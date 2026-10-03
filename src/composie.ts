@@ -50,26 +50,6 @@ function createDefaultContext<T extends IBaseContext> (channel: string, request?
 }
 
 /**
- * property name which is used to store the wrapped middleware in the route callback
- */
-const WRAPPED_MIDDLEWARE_NAME = getUUID()
-
-/**
- * standardize converter
- *  add WRAPPED_MIDDLEWARE_NAME property to original callback
- *  for a convenient way to removeRoute(off) a route
- * @param converter normal converter
- * @returns standardized convert
- */
-function createMiddlewareConverter<T extends IBaseContext>(converter: (fn: Function) => IMiddleware<T>) {
-  return (fn: Function) => {
-    const middleware = converter(fn)
-    fn[WRAPPED_MIDDLEWARE_NAME] = middleware
-    return middleware
-  }
-}
-
-/**
  * composie error codes
  */
 export const COMPOSIE_ERROR_CODES = {
@@ -181,11 +161,11 @@ export default class Composie<
   /**
    * global middlewares
    */
-  private middlewares: IGlobalMiddleware<IContext> = {}
+  private middlewares: IGlobalMiddleware<IContext> = Object.create(null)
   /**
    * router map
    */
-  private routers: IRouters<IContext> = {}
+  private routers: IRouters<IContext> = Object.create(null)
   /**
    * create context function
    */
@@ -202,7 +182,10 @@ export default class Composie<
   /**
    * route alias map
    */
-  private aliasMap: { [k: string]: string } = {}
+  private aliasMap: { [k: string]: string } = Object.create(null)
+
+  /** Original callbacks for converted handlers, isolated to this instance. */
+  private originalCallbacks = new WeakMap<IMiddleware<IContext>, { original: IRouterFn; converted: IMiddleware<IContext> }>()
 
   constructor (options: IComposieOptions<IContext> = createDefaultContext) {
     if (typeof options === 'function') {
@@ -223,8 +206,8 @@ export default class Composie<
    * add global middleware
    * @param cb middleware
    */
-  use (cb: IMiddleware<IContext>)
-  use (prefix: string, cb: IMiddleware<IContext>)
+  use (cb: IMiddleware<IContext>): any
+  use (prefix: string, cb: IMiddleware<IContext>): any
   /**
    * add global middleware focus on specific channel prefix
    * @param prefix channel prefix
@@ -245,13 +228,13 @@ export default class Composie<
    * add router
    * @param routers router map
    */
-  route (routers: IRouteParam<IRouterFn>)
+  route (routers: IRouteParam<IRouterFn>): any
   /**
    * add router
    * @param channel channel name
    * @param cbs channel handlers
    */
-  route (channel: string, ...cbs: IRouterFn[])
+  route (channel: string, ...cbs: IRouterFn[]): any
   route (routers: IRouteParam<IRouterFn> | string, ...cbs: IRouterFn[]) {
     if (typeof routers === 'string') {
       routers = {
@@ -259,8 +242,8 @@ export default class Composie<
       }
     }
     Object.keys(routers).forEach((k) => {
-      const channel = this.aliasMap[k] || k
-      let cbs = routers[channel]
+      const channel = this.aliasMap[k] ?? k
+      let cbs = routers[k]
       if (!Array.isArray(cbs)) cbs = [cbs]
       if (!cbs.length) return
       if (!this.routers[channel]) {
@@ -268,7 +251,12 @@ export default class Composie<
       }
       if (this.fn2middleware) {
         // @ts-ignore
-        cbs = cbs.map(this.fn2middleware)
+        cbs = cbs.map(cb => {
+          const converted = this.fn2middleware!(cb as Function)
+          const middleware: IMiddleware<IContext> = (ctx, next) => converted(ctx, next)
+          this.originalCallbacks.set(middleware, { original: cb, converted })
+          return middleware
+        })
       }
       // @ts-ignore
       this.routers[channel].push(...cbs)
@@ -308,7 +296,7 @@ export default class Composie<
    */
   removeRoute(channel: string, cb?: IRouterFn) {
     // remove alias if exists
-    if (this.aliasMap[channel]) {
+    if (this.aliasMap[channel] !== undefined) {
       delete this.aliasMap[channel]
       return true
     }
@@ -318,14 +306,9 @@ export default class Composie<
       delete this.routers[channel]
       return true
     }
-    const middleware = cb[WRAPPED_MIDDLEWARE_NAME] || cb
     const newCbs = cbs.filter(c => {
-      if (c === middleware) {
-        // clear wrapped middleware
-        delete cb[WRAPPED_MIDDLEWARE_NAME]
-        return false
-      }
-      return true
+      const registration = this.originalCallbacks.get(c)
+      return c !== cb && registration?.original !== cb && registration?.converted !== cb
     })
     if (newCbs.length === cbs.length) return false
     if (newCbs.length) {
@@ -349,7 +332,7 @@ export default class Composie<
    */
   run (channel: string, data?: any) {
     const ctx: IContext = this.createContext(channel, data)
-    const method = this.aliasMap[ctx.channel] || ctx.channel
+    const method = this.aliasMap[ctx.channel] ?? ctx.channel
     const routerCbs = this.routers[method] || []
     if (!routerCbs.length) {
       if (this.throwWhenNoRoute) {
@@ -366,8 +349,7 @@ export default class Composie<
     cbs.push(...routerCbs)
     return new Promise((resolve, reject) => {
       if (cbs.length) {
-        const fnMiddlewares = this.composeMiddlewares(cbs)
-        fnMiddlewares(ctx).then(() => resolve(ctx.response)).catch(reject)
+        this.composeMiddlewares(cbs)(ctx).then(() => resolve(ctx.response)).catch(reject)
       } else {
         resolve(undefined)
       }
@@ -394,12 +376,8 @@ export default class Composie<
     if (channel === this.wildcard) {
       // if wildcard not exists, add exist middlewares to wildcard's children
       if (!this.middlewares[channel]) {
-        this.middlewares = {
-          [channel]: {
-            mdlws: [],
-            children: middlewares
-          }
-        }
+        this.middlewares = Object.create(null)
+        this.middlewares[channel] = { mdlws: [], children: middlewares }
       }
       this.middlewares[channel].mdlws.push(cb)
       return
@@ -426,20 +404,22 @@ export default class Composie<
             break
           }
           // no children, insert as the children
-          middlewares[key].children = { [channel]: { mdlws: [cb] } }
+          middlewares[key].children = Object.create(null)
+          middlewares[key].children![channel] = { mdlws: [cb] }
           return
         }
         // channel contains existing tree
         //  e.g. key = 'a/b', channel = 'a'
         if (key.indexOf(channel) === 0) {
-          const item = middlewares[key]
-          delete middlewares[key]
-          middlewares[channel] = {
-            mdlws: [cb],
-            children: {
-              [key]: item
+          // Move every matching sibling so registration order cannot hide a parent.
+          const children: IGlobalMiddleware<IContext> = Object.create(null)
+          for (const childKey of keys) {
+            if (childKey.indexOf(channel) === 0) {
+              children[childKey] = middlewares[childKey]
+              delete middlewares[childKey]
             }
           }
+          middlewares[channel] = { mdlws: [cb], children }
           return
         }
       }
@@ -460,7 +440,7 @@ export default class Composie<
       // last called middleware #
       let index = -1
       return dispatch(0)
-      function dispatch (i) {
+      function dispatch (i: number): Promise<any> {
         if (i <= index) {
           return Promise.reject(new Error('next() called multiple times'))
         }
@@ -507,7 +487,7 @@ export default class Composie<
  * fn receives a request object and returns a response object(can be a promise) or undefined
  *    if response is undefined, then it will be ignored
  */
-const convert2middleware = createMiddlewareConverter((fn: Function) => {
+const convert2middleware = (fn: Function): IMiddleware<IBaseContext> => {
   return async function (ctx: IBaseContext, next: Function) {
     const response = await fn(ctx.request)
     if (typeof response !== 'undefined') {
@@ -515,7 +495,7 @@ const convert2middleware = createMiddlewareConverter((fn: Function) => {
     }
     return next()
   }
-})
+}
 
 
 export interface IEventBusOptions<C extends IBaseContext> extends INormalComposeOptions<C> {
@@ -539,4 +519,75 @@ export function createEventBus<
   newOptions.createContext = options.createContext || createDefaultContext
   newOptions.convertCallback2Middleware = options.convertCallback2Middleware || convert2middleware
   return new Composie<C, IFn>(newOptions)
+}
+
+/** Request and response types for one named operation. */
+export interface IChannelDefinition<Request = unknown, Response = unknown> {
+  request: Request
+  response: Response
+}
+
+type ChannelNames<Channels> = Extract<keyof Channels, string>
+type RequestArguments<Request> = undefined extends Request
+  ? [Request?]
+  : [Request]
+
+/** Route context. The channel remains a string because calls may use aliases. */
+export type ITypedContext<Definition extends IChannelDefinition, C extends IBaseContext = IBaseContext> =
+  Pick<C, Exclude<keyof C, 'channel' | 'request' | 'response'>> & {
+    readonly channel: string
+    readonly request: Definition['request']
+    response: Definition['response'] | undefined
+  }
+
+export type ITypedMiddleware<C> = (ctx: C, next: () => Promise<unknown>) => unknown
+
+type TypedRoutes<Channels, C extends IBaseContext> = {
+  [K in ChannelNames<Channels>]?: Channels[K] extends IChannelDefinition
+    ? ITypedMiddleware<ITypedContext<Channels[K], C>> | ITypedMiddleware<ITypedContext<Channels[K], C>>[]
+    : never
+}
+
+type TypedRun<Channels extends { [K in keyof Channels]: IChannelDefinition }> =
+  <K extends ChannelNames<Channels>>(
+    channel: K,
+    ...args: RequestArguments<Channels[K]['request']>
+  ) => Promise<Channels[K]['response'] | undefined>
+
+/** An opt-in typed view of the existing Composie runtime. */
+export interface ITypedComposie<
+  Channels extends { [K in keyof Channels]: IChannelDefinition },
+  C extends IBaseContext = IBaseContext
+> {
+  use(cb: IMiddleware<C>): ITypedComposie<Channels, C>
+  use(prefix: string, cb: IMiddleware<C>): ITypedComposie<Channels, C>
+  route(routers: TypedRoutes<Channels, C>): ITypedComposie<Channels, C>
+  route<K extends ChannelNames<Channels>>(
+    channel: K,
+    ...handlers: ITypedMiddleware<ITypedContext<Channels[K], C>>[]
+  ): ITypedComposie<Channels, C>
+  on: ITypedComposie<Channels, C>['route']
+  run: TypedRun<Channels>
+  emit: TypedRun<Channels>
+  call: TypedRun<Channels>
+  removeRoute<K extends ChannelNames<Channels>>(
+    channel: K,
+    callback?: ITypedMiddleware<ITypedContext<Channels[K], C>>
+  ): boolean
+  off: ITypedComposie<Channels, C>['removeRoute']
+  alias<K extends ChannelNames<Channels>, Alias extends string>(
+    existing: K,
+    alias: Alias
+  ): ITypedComposie<Channels & Record<Alias, Channels[K]>, C>
+}
+
+/**
+ * Define operation contracts without changing the middleware execution model.
+ * Contracts are checked by TypeScript; payloads are not validated at runtime.
+ */
+export function createTypedComposie<
+  Channels extends { [K in keyof Channels]: IChannelDefinition },
+  C extends IBaseContext = IBaseContext
+>(options?: IComposieOptions<C>): ITypedComposie<Channels, C> {
+  return new Composie<C>(options) as unknown as ITypedComposie<Channels, C>
 }

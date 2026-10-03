@@ -1,21 +1,23 @@
 {
   "compilerOptions": {
     "outDir": "./dist/",
-    "sourceMap": true,
+    "sourceMap": false,
     "declaration": true,
     "strict": true,
     "noImplicitReturns": true,
     "noImplicitAny": false,
-    "emitDecoratorMetadata": true,
-    "experimentalDecorators": true,
     "allowSyntheticDefaultImports": true,
     "module": "ESNext",
-    "moduleResolution": "node",
+    "moduleResolution": "bundler",
     "esModuleInterop": false,
     "target": "es6",
     "allowJs": false,
-    "baseUrl": "./",
-    "lib": ["dom", "es7"]
+    "lib": [
+      "dom",
+      "es2020"
+    ]
   },
-  "include": ["./src/**/*.ts"]
+  "include": [
+    "./src/**/*.ts"
+  ]
 }

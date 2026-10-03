@@ -93,3 +93,27 @@ describe('useEventCallbackStyle', () => {
   })
 
 })
+
+describe('shared custom converter output', () => {
+  it('removes only the matching original callback when a converter reuses middleware', async () => {
+    const shared = (ctx, next) => { ctx.response = (ctx.response || 0) + 1; return next() }
+    const bus = createEventBus({ convertCallback2Middleware: () => shared })
+    const first = () => 'first'
+    const second = () => 'second'
+    bus.on('event', first).on('event', second)
+    expect(await bus.emit('event')).toBe(2)
+    expect(bus.off('event', first)).toBe(true)
+    expect(await bus.emit('event')).toBe(1)
+    expect(bus.off('event', first)).toBe(false)
+    expect(bus.off('event', second)).toBe(true)
+    expect(await bus.emit('event')).toBeUndefined()
+  })
+
+  it('retains removal by the converted middleware for legacy custom converters', async () => {
+    const shared = (ctx, next?: Function) => { ctx.response = ctx.request; return next!() }
+    const bus = createEventBus({ convertCallback2Middleware: () => shared })
+    bus.on('event', () => 'original')
+    expect(bus.off('event', shared)).toBe(true)
+    expect(await bus.emit('event', 'removed')).toBeUndefined()
+  })
+})

@@ -5,20 +5,19 @@ harbor.use(function (ctx, next) {
   if (ctx.request && ctx.request.cmd === 'danger') {
     ctx.response = 'cmd not allowed'
   } else {
-    // next();
-    next()
+    return next()
   }
 })
 
 harbor.use('api/', function (ctx, next) {
   ctx.from = +new Date()
-  next()
+  return next()
 })
 
 harbor.use('view/', function (ctx, next) {
   if (!ctx.request) throw new Error('bad request')
   ctx.from = +new Date()
-  next()
+  return next()
 })
 
 // add one router
@@ -55,10 +54,7 @@ harbor
   })
 
 harbor
-  .run({
-    channel: 'view/home',
-    request: 'sssss'
-  })
+  .run('view/home', 'sssss')
   .then(resp => {
     console.log('with custom ctx', resp)
   })

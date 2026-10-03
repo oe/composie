@@ -1,28 +1,39 @@
 {
   "name": "composie",
   "version": "1.1.0",
-  "description": "Compose middleware with router and run it like a charm. Also serves as an advanced event bus with on, off, and emit methods.",
+  "description": "Koa-style middleware for named async operations, with channel routing, short-circuiting, and request/response results.",
   "main": "dist/composie.umd.js",
   "module": "dist/composie.es.js",
   "types": "dist/composie.d.ts",
   "scripts": {
-    "clean": "rimraf dist",
-    "prebuild": "yarn clean && yarn test",
-    "build": "rollup -c",
-    "dev": "parcel test/web/index.html --open",
-    "test": "jest --coverage",
-    "prepublish": "yarn build"
+    "clean": "node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true })\"",
+    "dev": "vite --open /test/web/",
+    "test": "vitest run --coverage",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.test.json && tsc --noEmit -p tsconfig.types.json",
+    "build": "pnpm run clean && pnpm run typecheck && pnpm test && vite build && pnpm run build:types && pnpm run build:esm",
+    "build:types": "tsc --emitDeclarationOnly --sourceMap false",
+    "test:dist": "node scripts/test-dist.cjs && tsc --noEmit -p tsconfig.dist.json",
+    "prepublishOnly": "pnpm run build && pnpm run test:dist",
+    "build:esm": "node scripts/copy-esm.cjs"
   },
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "repository": {
     "type": "git",
     "url": "git+https://oe@github.com/oe/composie.git"
   },
   "keywords": [
     "middleware",
-    "router",
+    "async-middleware",
+    "middleware-composition",
+    "middleware-router",
+    "pipeline",
+    "request-response",
     "event-bus",
-    "koa",
+    "typescript",
+    "koa-compose",
     "composie"
   ],
   "author": {
@@ -35,16 +46,11 @@
   },
   "homepage": "https://github.com/oe/composie#readme",
   "devDependencies": {
-    "@rollup/plugin-typescript": "^11.1.6",
-    "@types/jest": "^29.5.12",
-    "jest": "^29.7.0",
-    "parcel": "^2.12.0",
-    "rimraf": "^3.0.2",
-    "rollup": "^4.18.0",
-    "rollup-plugin-dts": "^6.1.1",
-    "ts-jest": "^29.1.2",
-    "ts-node": "^10.9.2",
-    "tslib": "^2.6.2",
-    "typescript": "^5.4.5"
-  }
+    "@types/node": "^22.19.0",
+    "@vitest/coverage-v8": "^5.0.3",
+    "typescript": "^5.9.3",
+    "vite": "^8.3.2",
+    "vitest": "^5.0.3"
+  },
+  "packageManager": "pnpm@12.8.1"
 }
