@@ -187,9 +187,6 @@ export default class Composie<
   /** Original callbacks for converted handlers, isolated to this instance. */
   private originalCallbacks = new WeakMap<IMiddleware<IContext>, { original: IRouterFn; converted: IMiddleware<IContext> }>()
 
-  /** Original callbacks behind independently disposable subscriptions. */
-  private subscriptionCallbacks = new WeakMap<Function, IRouterFn>()
-
   constructor (options: IComposieOptions<IContext> = createDefaultContext) {
     if (typeof options === 'function') {
       this.createContext = options
@@ -305,17 +302,23 @@ export default class Composie<
   subscribe(channel: string, cb: IRouterFn): () => boolean {
     if (typeof cb !== 'function') throw new TypeError('Subscription callback must be a function')
     const target = this.aliasMap[channel] ?? channel
-    const callback = cb as unknown as Function
-    let subscription: IRouterFn | undefined = ((...args: any[]) => callback(...args)) as unknown as IRouterFn
-    this.route(channel, subscription)
-    this.subscriptionCallbacks.set(subscription as unknown as Function, cb)
+    const converted = this.fn2middleware
+      ? this.fn2middleware(cb as unknown as Function)
+      : cb as unknown as IMiddleware<IContext>
+    let subscription: IMiddleware<IContext> | undefined = (ctx, next) => converted(ctx, next)
+    this.originalCallbacks.set(subscription, { original: cb, converted })
+    if (!this.routers[target]) this.routers[target] = []
+    this.routers[target].push(subscription)
     return () => {
       if (!subscription) return false
       const registered = subscription
       subscription = undefined
-      const removed = this.removeHandlers(target, registered)
-      this.subscriptionCallbacks.delete(registered as unknown as Function)
-      return removed
+      const handlers = this.routers[target]
+      if (!handlers || handlers.indexOf(registered) < 0) return false
+      const remaining = handlers.filter(handler => handler !== registered)
+      if (remaining.length) this.routers[target] = remaining
+      else delete this.routers[target]
+      return true
     }
   }
 
@@ -362,9 +365,7 @@ export default class Composie<
     }
     const newCbs = cbs.filter(c => {
       const registration = this.originalCallbacks.get(c)
-      const original = registration ? registration.original : c
-      const subscriber = typeof original === 'function' ? this.subscriptionCallbacks.get(original) : undefined
-      return c !== cb && registration?.original !== cb && registration?.converted !== cb && subscriber !== cb
+      return c !== cb && registration?.original !== cb && registration?.converted !== cb
     })
     if (newCbs.length === cbs.length) return false
     if (newCbs.length) {

@@ -128,6 +128,19 @@ describe('disposable subscriptions', () => {
     expect(await app.emit('event')).toBeUndefined()
   })
 
+  it('passes the original callback and its metadata to custom converters', async () => {
+    const callback = Object.freeze(Object.assign((value: string) => value, { label: 'original' }))
+    const converter = vi.fn(fn => async (ctx, next) => {
+      ctx.response = fn.label + ':' + await fn(ctx.request)
+      return next()
+    })
+    const app = createEventBus({ convertCallback2Middleware: converter })
+    const dispose = app.subscribe('event', callback)
+    expect(converter).toHaveBeenCalledWith(callback)
+    expect(await app.emit('event', 'value')).toBe('original:value')
+    expect(dispose()).toBe(true)
+  })
+
   it('rejects invalid subscription callbacks before registering a handler', () => {
     const app = new Composie()
     expect(() => app.subscribe('event', null as any)).toThrow(TypeError)
