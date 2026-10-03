@@ -4,7 +4,7 @@
 
 Use Composie when several operations need the same logging, authentication, error handling, or cache boundary. Register handlers by name, compose shared middleware, and `await` the result. It runs in Node.js and browsers, has no runtime dependencies, and does not require an HTTP server or a frontend framework.
 
-> **Development preview:** this branch adds `createTypedComposie` and the runnable operations playground. These additions are not yet published to npm. The published `1.1.0` API uses `new Composie()` or `createEventBus()`.
+> **New in 1.2.0:** optional channel contracts with `createTypedComposie`, a runnable operations playground, and fixes for aliases, prefix middleware, and callback removal. Existing `Composie` and `createEventBus` APIs remain compatible.
 
 ## Why use it?
 
@@ -23,7 +23,7 @@ run('users/get', request)
 - **Async composition:** `await next()` wraps downstream work, including errors.
 - **Short-circuiting:** set `ctx.response` and skip `next()` to stop the chain.
 - **Named results:** `run()` resolves to `ctx.response`, rather than broadcasting and discarding results.
-- **Optional TypeScript contracts:** the development preview checks each channel's request, handler response, and call result.
+- **Optional TypeScript contracts:** check each channel's request, handler response, and call result.
 
 ## Install
 
@@ -67,7 +67,7 @@ console.log(user); // { id: '1', name: 'Alice' }
 
 Return or await `next()` to continue; omit it to stop. Exceptions reject the promise returned by `run()`, and upstream middleware can catch them.
 
-## Typed operations — development preview
+## Typed operations
 
 Declare one request/response contract per channel:
 
@@ -208,7 +208,7 @@ pnpm build        # checks, Vite bundles, and TypeScript declarations
 pnpm test:dist    # CommonJS, ES module, and browser UMD smoke checks
 ```
 
-The build preserves `dist/composie.umd.js`, `dist/composie.es.js`, and `dist/composie.d.ts`, with an ES2015 JavaScript target. Additional `dist/composie.mjs` and `dist/composie.d.mts` entries provide an opt-in native ESM import: `import Composie from 'composie/dist/composie.mjs'`. The existing package entry and deep import paths remain available. Native Node.js imports of the package root keep the CommonJS namespace default (`const { default: Composie } = namespace`); bundlers continue to use the `module` entry. A publish-only validation hook checks the build and distribution before an explicit npm release. This development preview has not been released.
+The build preserves `dist/composie.umd.js`, `dist/composie.es.js`, and `dist/composie.d.ts`, with an ES2015 JavaScript target. Additional `dist/composie.mjs` and `dist/composie.d.mts` entries provide an opt-in native ESM import: `import Composie from 'composie/dist/composie.mjs'`. The existing package entry and deep import paths remain available. Native Node.js imports of the package root keep the CommonJS namespace default (`const { default: Composie } = namespace`); bundlers continue to use the `module` entry. A publish-only validation hook checks the build and distribution before an explicit npm release.
 
 Bug reports and focused contributions are welcome through [GitHub issues](https://github.com/oe/composie/issues) and pull requests. Include a runnable reproduction and tests for behavior changes.
 

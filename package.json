@@ -1,6 +1,6 @@
 {
   "name": "composie",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Koa-style middleware for named async operations, with channel routing, short-circuiting, and request/response results.",
   "main": "dist/composie.umd.js",
   "module": "dist/composie.es.js",
