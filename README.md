@@ -4,7 +4,7 @@
 
 Use Composie when several operations need the same logging, authentication, error handling, or cache boundary. Register handlers by name, compose shared middleware, and `await` the result. It runs in Node.js and browsers, has no runtime dependencies, and does not require an HTTP server or a frontend framework.
 
-> **New in 1.2.0:** optional channel contracts with `createTypedComposie`, a runnable operations playground, and fixes for aliases, prefix middleware, and callback removal. Existing `Composie` and `createEventBus` APIs remain compatible.
+> **New in 1.2.0:** optional channel contracts with `createTypedComposie`, disposable subscriptions, removable middleware, a runnable operations playground, and fixes for aliases, prefix middleware, and callback removal. Existing `Composie` and `createEventBus` APIs remain compatible.
 
 ## Why use it?
 
@@ -195,9 +195,9 @@ events.off('user/registered', listener);
 
 The default converter awaits callbacks sequentially. The last callback returning a defined value supplies the response; `undefined` does not overwrite it. A rejection stops the chain. This is different from parallel event fan-out. `use()` still accepts `(ctx, next)` middleware, and `createEventBus` supports `createContext`, `throwWhenNoRoute`, and `convertCallback2Middleware` options.
 
-## Lifecycle cleanup — unreleased
+## Lifecycle cleanup
 
-The following additions are on the development branch and are not part of npm 1.2.0. They help applications clean up handlers and shared middleware when a component or plugin is unmounted.
+Use these APIs to clean up handlers and shared middleware when a component or plugin is unmounted.
 
 ```js
 const dispose = events.subscribe('user/registered', listener);
