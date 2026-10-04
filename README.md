@@ -1,5 +1,11 @@
 # Composie
 
+[![MIT license](https://img.shields.io/npm/l/composie.svg)](https://github.com/oe/composie/blob/main/LICENSE)
+[![Written in TypeScript](https://img.shields.io/badge/%3C%2F%3E-typescript-blue)](https://www.typescriptlang.org/)
+[![npm version](https://badge.fury.io/js/composie.svg)](https://www.npmjs.com/package/composie)
+[![npm monthly downloads](https://img.shields.io/npm/dm/composie.svg)](https://www.npmjs.com/package/composie)
+[![CI](https://github.com/oe/composie/actions/workflows/pages.yml/badge.svg?branch=main)](https://github.com/oe/composie/actions/workflows/pages.yml)
+
 **Koa-style middleware for named async operations, with channel routing and request/response results.**
 
 Use Composie when several operations need the same logging, authentication, error handling, or cache boundary. Register handlers by name, compose shared middleware, and `await` the result. It runs in Node.js and browsers, has no runtime dependencies, and does not require an HTTP server or a frontend framework.
